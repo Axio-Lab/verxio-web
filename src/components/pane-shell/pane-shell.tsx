@@ -13,8 +13,9 @@ import {
   useRef
 } from 'react'
 
+import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
-import { $paneStates, ensurePaneRegistered, setPaneWidthOverride } from '@/store/panes'
+import { $paneStates, ensurePaneRegistered, setPaneOpen, setPaneWidthOverride } from '@/store/panes'
 
 import { PaneShellContext, type PaneShellContextValue, type PaneSlot } from './context'
 
@@ -122,9 +123,17 @@ function collectPanes(children: ReactNode) {
   return { left, mainCount, right }
 }
 
-function trackForPane(pane: CollectedPane, states: Record<string, { open: boolean; widthOverride?: number }>) {
+function trackForPane(
+  pane: CollectedPane,
+  states: Record<string, { open: boolean; widthOverride?: number }>,
+  isMobile: boolean
+) {
   const stateOpen = states[pane.id]?.open ?? pane.defaultOpen
   const open = !pane.disabled && stateOpen
+
+  if (isMobile) {
+    return { open, track: '0px' }
+  }
 
   if (!open) {
     return { open: false, track: '0px' }
@@ -137,6 +146,7 @@ function trackForPane(pane: CollectedPane, states: Record<string, { open: boolea
 
 export function PaneShell({ children, className, style }: PaneShellProps) {
   const paneStates = useStore($paneStates)
+  const isMobile = useIsMobile()
   const { left, mainCount, right } = useMemo(() => collectPanes(children), [children])
 
   if (import.meta.env.DEV && mainCount > 1) {
@@ -150,7 +160,7 @@ export function PaneShell({ children, className, style }: PaneShellProps) {
     let column = 1
 
     for (const pane of left) {
-      const { open, track } = trackForPane(pane, paneStates)
+      const { open, track } = trackForPane(pane, paneStates, isMobile)
       tracks.push(track)
       paneById.set(pane.id, { column, open, side: 'left' })
       cssVars[`--pane-${pane.id}-width`] = track
@@ -161,7 +171,7 @@ export function PaneShell({ children, className, style }: PaneShellProps) {
     const mainColumn = column++
 
     for (const pane of right) {
-      const { open, track } = trackForPane(pane, paneStates)
+      const { open, track } = trackForPane(pane, paneStates, isMobile)
       tracks.push(track)
       paneById.set(pane.id, { column, open, side: 'right' })
       cssVars[`--pane-${pane.id}-width`] = track
@@ -172,7 +182,7 @@ export function PaneShell({ children, className, style }: PaneShellProps) {
       cssVars: Record<string, string>
       gridTemplate: string
     }
-  }, [left, paneStates, right])
+  }, [isMobile, left, paneStates, right])
 
   const composedStyle = useMemo<CSSProperties>(
     () => ({ ...ctxValue.cssVars, ...style, gridTemplateColumns: ctxValue.gridTemplate }),
@@ -199,6 +209,7 @@ export function Pane({
   resizable = false
 }: PaneProps) {
   const ctx = useContext(PaneShellContext)
+  const isMobile = useIsMobile()
   const registered = useRef(false)
   const paneRef = useRef<HTMLDivElement | null>(null)
 
@@ -271,6 +282,37 @@ export function Pane({
 
   if (!slot) {
     return null
+  }
+
+  if (isMobile) {
+    if (!open) {
+      return null
+    }
+
+    return (
+      <>
+        <button
+          aria-label={`Close ${id}`}
+          className="fixed inset-0 z-60 bg-black/45"
+          onClick={() => setPaneOpen(id, false)}
+          type="button"
+        />
+        <div
+          aria-hidden={false}
+          className={cn(
+            'fixed inset-y-0 z-70 row-start-1 flex min-w-0 max-w-[min(85vw,20rem)] flex-col overflow-hidden bg-(--ui-sidebar-surface-background) shadow-xl',
+            slot.side === 'left' ? 'left-0' : 'right-0',
+            className
+          )}
+          data-pane-id={id}
+          data-pane-open="true"
+          data-pane-side={slot.side}
+          ref={paneRef}
+        >
+          {children}
+        </div>
+      </>
+    )
   }
 
   return (

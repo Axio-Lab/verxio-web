@@ -1611,7 +1611,7 @@ export const zh: Translations = {
 
   folderAccess: {
     title: '访问您电脑上的文件夹',
-    body: 'Verxio 将读取并浏览您选择的文件夹中的文件。随后浏览器会请您选择具体文件夹。文件不会上传，始终保留在您的设备上。',
+    body: 'Verxio 将读取并浏览您选择的文件夹中的文件。随后浏览器会请您选择文件夹。文件不会上传，始终保留在您的设备上。',
     allow: '继续',
     cancel: '暂不',
     unsupportedTitle: '不支持文件夹访问',

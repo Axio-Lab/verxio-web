@@ -1,11 +1,3 @@
-import {
-  isWebLocalPath,
-  pickBrowserLocalFolder,
-  readWebLocalDir,
-  readWebLocalFileText,
-  restoreRootHandle
-} from '@/lib/web-local-fs'
-
 import type {
   BackendExit,
   DesktopActiveProfile,
@@ -17,7 +9,6 @@ import type {
   DesktopConnectionTestResult,
   DesktopOauthLoginResult,
   DesktopOauthLogoutResult,
-  DesktopUpdateApplyOptions,
   DesktopUpdateApplyResult,
   DesktopUpdateStatus,
   DesktopVersionInfo,
@@ -25,15 +16,23 @@ import type {
   HermesConnection,
   HermesNotification,
   HermesPreviewFileChanged,
-  HermesPreviewTarget,
   HermesPreviewWatch,
   HermesReadDirResult,
   HermesReadFileTextResult,
   HermesSelectPathsOptions,
   HermesTerminalExit,
-  HermesTerminalSession,
-  HermesWindowState
+  HermesTerminalSession
 } from '@/global'
+import {
+  getStoredWebLocalRoot,
+  isWebLocalPath,
+  pickBrowserLocalFolder,
+  readWebLocalDir,
+  readWebLocalFileText,
+  restoreRootHandle,
+  WEB_LOCAL_STORAGE_KEY
+} from '@/lib/web-local-fs'
+import { $currentCwd, setCurrentCwd } from '@/store/session'
 
 declare global {
   interface Window {
@@ -43,7 +42,6 @@ declare global {
 
 const CONNECTION_CONFIG_KEY = 'verxio.connection.config'
 const ACTIVE_PROFILE_KEY = 'verxio.active.profile'
-const DEFAULT_PROJECT_DIR_KEY = 'verxio.default.project.dir'
 
 type Listener<T> = (payload: T) => void
 
@@ -84,9 +82,11 @@ function apiBaseUrl(): string {
 
 function buildApiUrl(path: string): string {
   const base = apiBaseUrl()
+
   if (base) {
     return `${base}${path}`
   }
+
   return path
 }
 
@@ -96,11 +96,13 @@ function buildWsUrl(path: string, params: Record<string, string>): string {
   const host = base ? new URL(base).host : window.location.host
   const pathname = base ? new URL(base).pathname.replace(/\/$/, '') : ''
   const qs = new URLSearchParams(params)
+
   return `${proto}//${host}${pathname}${path}?${qs.toString()}`
 }
 
 function authHeaders(): HeadersInit {
   const token = getToken()
+
   if (!token) {
     return {}
   }
@@ -116,6 +118,7 @@ const TOKEN_RELOAD_KEY = 'verxio.tokenReloadAttempted'
 
 function dashboardOrigin(): string {
   const base = apiBaseUrl()
+
   if (base) {
     return base.replace(/\/$/, '')
   }
@@ -134,6 +137,7 @@ async function refreshSessionToken(): Promise<boolean> {
     }
 
     window.__HERMES_SESSION_TOKEN__ = match[1]
+
     return true
   } catch {
     return false
@@ -190,6 +194,7 @@ async function fetchJson<T>(url: string, init: RequestInit & { timeoutMs?: numbe
         }
 
         window.location.reload()
+
         return new Promise<T>(() => {})
       }
     }
@@ -222,13 +227,14 @@ async function pickDirectoryPaths(): Promise<string[]> {
     return []
   }
 
-  localStorage.setItem(DEFAULT_PROJECT_DIR_KEY, browserPath)
+  localStorage.setItem(WEB_LOCAL_STORAGE_KEY, browserPath)
 
   return [browserPath]
 }
 
 function emitBoot(patch: Partial<DesktopBootProgress>) {
   bootProgress = { ...bootProgress, ...patch, timestamp: Date.now() }
+
   for (const listener of bootListeners) {
     listener(bootProgress)
   }
@@ -236,23 +242,28 @@ function emitBoot(patch: Partial<DesktopBootProgress>) {
 
 async function waitForDashboardReady(): Promise<void> {
   const deadline = Date.now() + 30_000
+
   while (Date.now() < deadline) {
     try {
       const res = await fetch(buildApiUrl('/api/status'))
+
       if (res.ok) {
         return
       }
     } catch {
       // retry
     }
+
     await new Promise(resolve => window.setTimeout(resolve, 500))
   }
+
   throw new Error('Verxio backend is not reachable. Start it with: hermes dashboard --no-open')
 }
 
 async function getConnection(): Promise<HermesConnection> {
   await waitForDashboardReady()
   const token = getToken()
+
   if (!token) {
     throw new Error('Missing Verxio session token. Restart hermes dashboard and reload.')
   }
@@ -285,12 +296,14 @@ async function getConnection(): Promise<HermesConnection> {
 function readConnectionConfig(): DesktopConnectionConfig {
   try {
     const raw = localStorage.getItem(CONNECTION_CONFIG_KEY)
+
     if (raw) {
       return JSON.parse(raw) as DesktopConnectionConfig
     }
   } catch {
     // ignore
   }
+
   return {
     envOverride: false,
     mode: 'local',
@@ -319,12 +332,14 @@ export function installWebBridge(): void {
     touchBackend: async () => ({ ok: true }),
     getGatewayWsUrl: async () => {
       const conn = await getConnection()
+
       return conn.wsUrl
     },
     getBootProgress: async () => bootProgress,
     getConnectionConfig: async () => readConnectionConfig(),
     saveConnectionConfig: async (payload: DesktopConnectionConfigInput) => {
       const current = readConnectionConfig()
+
       const next: DesktopConnectionConfig = {
         ...current,
         mode: payload.mode,
@@ -334,21 +349,27 @@ export function installWebBridge(): void {
         remoteTokenSet: Boolean(payload.remoteToken),
         remoteTokenPreview: payload.remoteToken ? '••••••••' : current.remoteTokenPreview
       }
+
       writeConnectionConfig(next)
+
       return next
     },
     applyConnectionConfig: async (payload: DesktopConnectionConfigInput) => {
       const next = await window.hermesDesktop.saveConnectionConfig(payload)
       window.location.reload()
+
       return next
     },
     testConnectionConfig: async (payload: DesktopConnectionConfigInput) => {
       const url = payload.remoteUrl?.trim()
+
       if (!url) {
         return { ok: false, baseUrl: '', version: null } satisfies DesktopConnectionTestResult
       }
+
       try {
         const status = await fetchJson<{ version?: string }>(`${url.replace(/\/$/, '')}/api/status`)
+
         return {
           ok: true,
           baseUrl: url,
@@ -360,11 +381,13 @@ export function installWebBridge(): void {
     },
     probeConnectionConfig: async (remoteUrl: string) => {
       const baseUrl = remoteUrl.replace(/\/$/, '')
+
       try {
         const status = await fetchJson<{
           auth_required?: boolean
           version?: string
         }>(`${baseUrl}/api/status`)
+
         return {
           baseUrl,
           reachable: true,
@@ -386,6 +409,7 @@ export function installWebBridge(): void {
     },
     oauthLoginConnectionConfig: async (remoteUrl: string) => {
       window.open(remoteUrl, '_blank', 'noopener,noreferrer')
+
       return { ok: true, baseUrl: remoteUrl, connected: false } satisfies DesktopOauthLoginResult
     },
     oauthLogoutConnectionConfig: async () => {
@@ -394,6 +418,7 @@ export function installWebBridge(): void {
     profile: {
       get: async () => {
         const profile = localStorage.getItem(ACTIVE_PROFILE_KEY)
+
         return { profile } satisfies DesktopActiveProfile
       },
       set: async (name: string | null) => {
@@ -402,12 +427,15 @@ export function installWebBridge(): void {
         } else {
           localStorage.removeItem(ACTIVE_PROFILE_KEY)
         }
+
         window.location.reload()
+
         return { profile: name }
       }
     },
     api: async <T>(request: HermesApiRequest) => {
       const url = buildApiUrl(request.path)
+
       return fetchJson<T>(url, {
         method: request.method ?? 'GET',
         body: request.body !== undefined ? JSON.stringify(request.body) : undefined,
@@ -418,19 +446,24 @@ export function installWebBridge(): void {
       if (!('Notification' in window)) {
         return false
       }
+
       if (Notification.permission === 'granted') {
         new Notification(payload.title ?? 'Verxio', {
           body: payload.body ?? '',
           silent: Boolean(payload.silent)
         })
+
         return true
       }
+
       if (Notification.permission !== 'denied') {
         const permission = await Notification.requestPermission()
+
         if (permission === 'granted') {
           return window.hermesDesktop.notify(payload)
         }
       }
+
       return false
     },
     requestMicrophoneAccess: async () => {
@@ -441,9 +474,11 @@ export function installWebBridge(): void {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
         stream.getTracks().forEach(track => track.stop())
+
         return true
       } catch (error) {
         console.warn('[verxio] Microphone permission denied or unavailable:', error)
+
         return false
       }
     },
@@ -489,6 +524,7 @@ export function installWebBridge(): void {
     writeClipboard: async (text: string) => {
       try {
         await navigator.clipboard.writeText(text)
+
         return true
       } catch {
         return false
@@ -503,10 +539,12 @@ export function installWebBridge(): void {
       const id = crypto.randomUUID()
       const watch = { id, path: url }
       previewWatches.set(id, watch)
+
       return watch
     },
     stopPreviewFileWatch: async (id: string) => {
       previewWatches.delete(id)
+
       return true
     },
     openExternal: async (url: string) => {
@@ -516,7 +554,7 @@ export function installWebBridge(): void {
     settings: {
       getDefaultProjectDir: async () => ({
         defaultLabel: 'Project directory',
-        dir: localStorage.getItem(DEFAULT_PROJECT_DIR_KEY)
+        dir: localStorage.getItem(WEB_LOCAL_STORAGE_KEY)
       }),
       pickDefaultProjectDir: async () => {
         const paths = await pickDirectoryPaths()
@@ -529,10 +567,11 @@ export function installWebBridge(): void {
       },
       setDefaultProjectDir: async (dir: string | null) => {
         if (dir) {
-          localStorage.setItem(DEFAULT_PROJECT_DIR_KEY, dir)
+          localStorage.setItem(WEB_LOCAL_STORAGE_KEY, dir)
         } else {
-          localStorage.removeItem(DEFAULT_PROJECT_DIR_KEY)
+          localStorage.removeItem(WEB_LOCAL_STORAGE_KEY)
         }
+
         return { dir }
       }
     },
@@ -584,6 +623,7 @@ export function installWebBridge(): void {
       try {
         const params = new URLSearchParams({ path: startPath })
         const result = await fetchJson<{ root: string | null }>(buildApiUrl(`/api/fs/git-root?${params.toString()}`))
+
         return result.root
       } catch {
         return null
@@ -595,6 +635,7 @@ export function installWebBridge(): void {
         const channel = id
         const token = getToken()
         const ws = new WebSocket(buildWsUrl('/api/pty', { token, channel }))
+
         const session: PtySession = {
           id,
           channel,
@@ -604,23 +645,30 @@ export function installWebBridge(): void {
           dataListeners: new Set(),
           exitListeners: new Set()
         }
+
         ptySessions.set(id, session)
 
         ws.onmessage = event => {
           const payload = typeof event.data === 'string' ? event.data : ''
+
           for (const listener of session.dataListeners) {
             listener(payload)
           }
         }
+
         ws.onclose = () => {
           const exit = { code: 0, signal: null } satisfies HermesTerminalExit
+
           for (const listener of session.exitListeners) {
             listener(exit)
           }
+
           ptySessions.delete(id)
         }
+
         ws.onerror = () => {
           const exit = { code: 1, signal: null } satisfies HermesTerminalExit
+
           for (const listener of session.exitListeners) {
             listener(exit)
           }
@@ -639,57 +687,75 @@ export function installWebBridge(): void {
       },
       write: async (id: string, data: string) => {
         const session = ptySessions.get(id)
+
         if (!session || session.ws.readyState !== WebSocket.OPEN) {
           return false
         }
+
         session.ws.send(data)
+
         return true
       },
       resize: async (id: string, size: { cols: number; rows: number }) => {
         const session = ptySessions.get(id)
+
         if (!session || session.ws.readyState !== WebSocket.OPEN) {
           return false
         }
+
         session.ws.send(`\x1b[RESIZE:${size.cols};${size.rows}]`)
+
         return true
       },
       dispose: async (id: string) => {
         const session = ptySessions.get(id)
+
         if (!session) {
           return false
         }
+
         session.ws.close()
         ptySessions.delete(id)
+
         return true
       },
       onData: (id: string, callback: (payload: string) => void) => {
         const session = ptySessions.get(id)
+
         if (!session) {
           return () => undefined
         }
+
         session.dataListeners.add(callback)
+
         return () => session.dataListeners.delete(callback)
       },
       onExit: (id: string, callback: (payload: HermesTerminalExit) => void) => {
         const session = ptySessions.get(id)
+
         if (!session) {
           return () => undefined
         }
+
         session.exitListeners.add(callback)
+
         return () => session.exitListeners.delete(callback)
       }
     },
     onPreviewFileChanged: (callback: (payload: HermesPreviewFileChanged) => void) => {
       previewListeners.add(callback)
+
       return () => previewListeners.delete(callback)
     },
     onBackendExit: (callback: (payload: BackendExit) => void) => {
       backendExitListeners.add(callback)
+
       return () => backendExitListeners.delete(callback)
     },
     onBootProgress: (callback: (payload: DesktopBootProgress) => void) => {
       bootListeners.add(callback)
       callback(bootProgress)
+
       return () => bootListeners.delete(callback)
     },
     getBootstrapState: async () =>
@@ -735,10 +801,16 @@ export function installWebBridge(): void {
   }
 
   void (async () => {
-    const saved = localStorage.getItem(DEFAULT_PROJECT_DIR_KEY)
+    const saved = getStoredWebLocalRoot()
 
-    if (saved && isWebLocalPath(saved)) {
-      await restoreRootHandle()
+    if (!saved) {
+      return
+    }
+
+    await restoreRootHandle()
+
+    if (!isWebLocalPath($currentCwd.get())) {
+      setCurrentCwd(saved)
     }
   })()
 

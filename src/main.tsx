@@ -1,7 +1,8 @@
 import './styles.css'
 
-import { installWebBridge } from '@/platform/install-web-bridge'
 import { QueryClientProvider } from '@tanstack/react-query'
+
+import { installWebBridge } from '@/platform/install-web-bridge'
 
 installWebBridge()
 import { StrictMode } from 'react'

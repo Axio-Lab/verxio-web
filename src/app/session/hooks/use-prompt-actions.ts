@@ -20,7 +20,10 @@ import {
 } from '@/lib/desktop-slash-commands'
 import { triggerHaptic } from '@/lib/haptics'
 import { setMutableRef } from '@/lib/mutable-ref'
+import { isVerxioWeb } from '@/lib/platform'
 import { isProviderSetupErrorMessage } from '@/lib/provider-setup-errors'
+import { preprocessWebLocalContextReferences } from '@/lib/web-local-context'
+import { resolveWebLocalWorkspaceCwd } from '@/lib/web-local-fs'
 import { setSessionYolo } from '@/lib/yolo-session'
 import {
   $composerAttachments,
@@ -34,6 +37,7 @@ import { requestDesktopOnboarding } from '@/store/onboarding'
 import { $activeGatewayProfile, $newChatProfile, ensureGatewayProfile, normalizeProfileKey } from '@/store/profile'
 import {
   $busy,
+  $currentCwd,
   $messages,
   $yoloActive,
   setAwaitingResponse,
@@ -352,7 +356,18 @@ export function usePromptActions({
         await syncImageAttachmentsForSubmit(sessionId, attachments, {
           updateComposerAttachments: usingComposerAttachments
         })
-        await requestGateway('prompt.submit', { session_id: sessionId, text })
+
+        let submitText = text
+
+        if (isVerxioWeb()) {
+          const webLocalCwd = resolveWebLocalWorkspaceCwd($currentCwd.get())
+
+          if (webLocalCwd) {
+            submitText = await preprocessWebLocalContextReferences(submitText, webLocalCwd)
+          }
+        }
+
+        await requestGateway('prompt.submit', { session_id: sessionId, text: submitText })
 
         if (usingComposerAttachments) {
           clearComposerAttachments()

@@ -1469,7 +1469,7 @@ export const en: Translations = {
 
   folderAccess: {
     title: 'Access a folder on your computer',
-    body: 'Verxio will read and browse files in the folder you choose. Your browser will then ask you to pick the folder. Nothing is uploaded — files stay on your device.',
+    body: 'Verxio will read and browse files in the folder you choose. Agent can also create new files in the folder you choose.',
     allow: 'Continue',
     cancel: 'Not now',
     unsupportedTitle: 'Folder access not supported',

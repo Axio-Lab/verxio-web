@@ -5,6 +5,7 @@ import { useSyncExternalStore } from 'react'
 import { NotificationStack } from '@/components/notifications'
 import { PaneShell } from '@/components/pane-shell'
 import { SidebarProvider } from '@/components/ui/sidebar'
+import { useResponsivePanes } from '@/hooks/use-responsive-panes'
 import {
   $fileBrowserOpen,
   $panesFlipped,
@@ -55,6 +56,8 @@ export function AppShell({
   statusbarItems,
   titlebarTools
 }: AppShellProps) {
+  useResponsivePanes()
+
   const sidebarOpen = useStore($sidebarOpen)
   const fileBrowserOpen = useStore($fileBrowserOpen)
   const panesFlipped = useStore($panesFlipped)

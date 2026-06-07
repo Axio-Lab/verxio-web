@@ -1,5 +1,7 @@
 import { atom, computed, type ReadableAtom } from 'nanostores'
 
+import { isMobileViewport, MOBILE_OVERLAY_PANE_IDS } from '@/lib/responsive'
+
 export interface PaneStateSnapshot {
   open: boolean
   widthOverride?: number
@@ -113,6 +115,28 @@ export function ensurePaneRegistered(id: string, defaults: PaneRegisterDefaults)
   $paneStates.set({ ...current, [id]: { open: defaults.open, widthOverride: defaults.widthOverride } })
 }
 
+function closeOtherMobileOverlayPanes(exceptId: string, current: Record<string, PaneStateSnapshot>) {
+  if (!isMobileViewport()) {
+    return current
+  }
+
+  if (!MOBILE_OVERLAY_PANE_IDS.includes(exceptId as (typeof MOBILE_OVERLAY_PANE_IDS)[number])) {
+    return current
+  }
+
+  let next = current
+
+  for (const paneId of MOBILE_OVERLAY_PANE_IDS) {
+    if (paneId === exceptId || !current[paneId]?.open) {
+      continue
+    }
+
+    next = { ...next, [paneId]: { ...current[paneId]!, open: false } }
+  }
+
+  return next
+}
+
 export function setPaneOpen(id: string, open: boolean) {
   const current = $paneStates.get()
   const existing = current[id]
@@ -121,13 +145,27 @@ export function setPaneOpen(id: string, open: boolean) {
     return
   }
 
-  $paneStates.set({ ...current, [id]: { open, widthOverride: existing?.widthOverride } })
+  let next = { ...current, [id]: { open, widthOverride: existing?.widthOverride } }
+
+  if (open) {
+    next = closeOtherMobileOverlayPanes(id, next)
+  }
+
+  $paneStates.set(next)
 }
 
 export function togglePane(id: string) {
   const current = $paneStates.get()
   const existing = current[id]
-  $paneStates.set({ ...current, [id]: { open: !(existing?.open ?? false), widthOverride: existing?.widthOverride } })
+  const open = !(existing?.open ?? false)
+
+  let next = { ...current, [id]: { open, widthOverride: existing?.widthOverride } }
+
+  if (open) {
+    next = closeOtherMobileOverlayPanes(id, next)
+  }
+
+  $paneStates.set(next)
 }
 
 export function setPaneWidthOverride(id: string, width: number | undefined) {

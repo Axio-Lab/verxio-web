@@ -1,3 +1,5 @@
+import { MOBILE_MEDIA_QUERY } from '@/lib/responsive'
+
 import { useMediaQuery } from './use-media-query'
 
-export const useIsMobile = () => useMediaQuery(`(max-width: ${768 / 16 - 1 / 16}rem)`)
+export const useIsMobile = () => useMediaQuery(MOBILE_MEDIA_QUERY)

@@ -86,6 +86,7 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
       }
     },
     {
+      className: 'max-md:hidden',
       icon: <Codicon name="arrow-swap" />,
       id: 'flip-panes',
       label: t.titlebar.swapSidebarSides,
@@ -118,6 +119,7 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
       onSelect: toggleHaptics
     },
     {
+      className: 'max-sm:hidden',
       icon: <Codicon name="keyboard" />,
       id: 'keybinds',
       label: t.titlebar.openKeybinds,
@@ -154,7 +156,7 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
     <>
       <div
         aria-label={t.shell.windowControls}
-        className="fixed left-(--titlebar-controls-left) top-(--titlebar-controls-top) z-70 flex translate-y-0.5 flex-row items-center gap-x-1 pointer-events-auto select-none [-webkit-app-region:no-drag]"
+        className="fixed left-(--titlebar-controls-left) top-(--titlebar-controls-top) z-70 flex max-w-[calc(100vw-6rem)] translate-y-0.5 flex-row items-center gap-x-0.5 overflow-x-auto pointer-events-auto select-none [-webkit-app-region:no-drag] sm:max-w-none sm:gap-x-1"
       >
         {leftToolbarTools
           .filter(tool => !tool.hidden)
@@ -184,7 +186,7 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
 
       <div
         aria-label={t.shell.appControls}
-        className="fixed right-(--titlebar-tools-right) top-(--titlebar-controls-top) z-70 flex flex-row items-center justify-end gap-x-1 pointer-events-auto select-none [-webkit-app-region:no-drag]"
+        className="fixed right-(--titlebar-tools-right) top-(--titlebar-controls-top) z-70 flex max-w-[calc(100vw-4rem)] flex-row items-center justify-end gap-x-0.5 overflow-x-auto pointer-events-auto select-none [-webkit-app-region:no-drag] sm:max-w-none sm:gap-x-1"
       >
         {visibleSystemToolsBeforeSettings.map(tool => (
           <TitlebarToolButton key={tool.id} navigate={navigate} tool={tool} />

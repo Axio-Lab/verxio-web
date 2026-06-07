@@ -19,9 +19,15 @@ declare global {
 /** Virtual path prefix for folders granted via the browser File System Access API. */
 export const WEB_LOCAL_PREFIX = 'verxio-local:'
 
+/** localStorage key for the last browser-granted folder (see install-web-bridge). */
+export const WEB_LOCAL_STORAGE_KEY = 'verxio.default.project.dir'
+
 const IDB_NAME = 'verxio-web-fs'
 const IDB_STORE = 'handles'
 const ROOT_KEY = 'root'
+
+/** Read-only — avoids Chrome's "Save changes / edit files" permission dialog. */
+const WEB_LOCAL_ACCESS_MODE = 'read' as const
 
 let cachedRoot: FileSystemDirectoryHandle | null = null
 
@@ -31,6 +37,27 @@ export function isWebLocalPath(path: string): boolean {
 
 export function webLocalRootPath(name: string): string {
   return `${WEB_LOCAL_PREFIX}/${name}`
+}
+
+export function getStoredWebLocalRoot(): string | null {
+  if (typeof localStorage === 'undefined') {
+    return null
+  }
+
+  const saved = localStorage.getItem(WEB_LOCAL_STORAGE_KEY)?.trim()
+
+  return saved && isWebLocalPath(saved) ? saved : null
+}
+
+/** Resolve the browser-granted folder even when the gateway has replaced $currentCwd with a server path. */
+export function resolveWebLocalWorkspaceCwd(currentCwd?: string | null): string | null {
+  const trimmed = currentCwd?.trim()
+
+  if (trimmed && isWebLocalPath(trimmed)) {
+    return trimmed
+  }
+
+  return getStoredWebLocalRoot()
 }
 
 export function supportsBrowserFolderPicker(): boolean {
@@ -50,6 +77,7 @@ async function openDb(): Promise<IDBDatabase> {
     req.onupgradeneeded = () => {
       req.result.createObjectStore(IDB_STORE)
     }
+
     req.onsuccess = () => resolve(req.result)
     req.onerror = () => reject(req.error)
   })
@@ -78,6 +106,7 @@ async function loadStoredRootHandle(): Promise<FileSystemDirectoryHandle | null>
 
   try {
     const db = await openDb()
+
     const handle = await new Promise<FileSystemDirectoryHandle | null>((resolve, reject) => {
       const tx = db.transaction(IDB_STORE, 'readonly')
       const req = tx.objectStore(IDB_STORE).get(ROOT_KEY)
@@ -102,7 +131,7 @@ export async function restoreRootHandle(): Promise<FileSystemDirectoryHandle | n
     return null
   }
 
-  const perm = await handle.queryPermission({ mode: 'readwrite' })
+  const perm = await handle.queryPermission({ mode: WEB_LOCAL_ACCESS_MODE })
 
   if (perm !== 'granted') {
     return null
@@ -111,39 +140,6 @@ export async function restoreRootHandle(): Promise<FileSystemDirectoryHandle | n
   cachedRoot = handle
 
   return handle
-}
-
-/** User-initiated re-auth (refresh, etc.) — Verxio consent dialog, then browser permission. */
-export async function ensureWebLocalFolderAccess(): Promise<boolean> {
-  const handle = await loadStoredRootHandle()
-
-  if (!handle) {
-    return false
-  }
-
-  let perm = await handle.queryPermission({ mode: 'readwrite' })
-
-  if (perm === 'granted') {
-    cachedRoot = handle
-
-    return true
-  }
-
-  const approved = await requestFolderAccessConsent()
-
-  if (!approved) {
-    return false
-  }
-
-  perm = await handle.requestPermission({ mode: 'readwrite' })
-
-  if (perm !== 'granted') {
-    return false
-  }
-
-  cachedRoot = handle
-
-  return true
 }
 
 async function resolveHandleForPath(path: string): Promise<FileSystemDirectoryHandle | null> {
@@ -173,7 +169,7 @@ async function resolveHandleForPath(path: string): Promise<FileSystemDirectoryHa
   return current
 }
 
-/** Browser-native folder picker — grants read/write access to a folder on the user's PC. */
+/** Browser-native folder picker — grants read access to a folder on the user's PC. */
 export async function pickBrowserLocalFolder(): Promise<string | null> {
   if (!supportsBrowserFolderPicker()) {
     await showFolderAccessUnsupported()
@@ -188,7 +184,7 @@ export async function pickBrowserLocalFolder(): Promise<string | null> {
   }
 
   try {
-    const handle = await window.showDirectoryPicker!({ mode: 'readwrite' })
+    const handle = await window.showDirectoryPicker!({ mode: WEB_LOCAL_ACCESS_MODE })
 
     await persistRootHandle(handle)
 

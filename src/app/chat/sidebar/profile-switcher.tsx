@@ -134,6 +134,7 @@ export function ProfileRail() {
     profiles.filter(profile => !profile.is_default),
     order
   )
+
   const multiProfile = profiles.length > 1
 
   // distance constraint: a small drag reorders, a tap still selects the profile.

@@ -4,12 +4,12 @@ import type { ReactNode } from 'react'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
-import { useI18n } from '@/i18n'
 import { Loader } from '@/components/ui/loader'
 import { Tip } from '@/components/ui/tooltip'
+import { useI18n } from '@/i18n'
 import { normalizeOrLocalPreviewTarget } from '@/lib/local-preview'
-import { ensureWebLocalFolderAccess, isWebLocalPath } from '@/lib/web-local-fs'
 import { cn } from '@/lib/utils'
+import { resolveWebLocalWorkspaceCwd } from '@/lib/web-local-fs'
 import { $panesFlipped } from '@/store/layout'
 import { notifyError } from '@/store/notifications'
 import { setCurrentSessionPreviewTarget } from '@/store/preview'
@@ -46,7 +46,8 @@ export function RightSidebarPane({ onActivateFile, onActivateFolder, onChangeCwd
   const terminalTakeover = useStore($terminalTakeover)
   const panesFlipped = useStore($panesFlipped)
   const currentBranch = useStore($currentBranch).trim()
-  const currentCwd = useStore($currentCwd).trim()
+  const storedCwd = useStore($currentCwd).trim()
+  const currentCwd = resolveWebLocalWorkspaceCwd(storedCwd) ?? storedCwd
   const hasCwd = currentCwd.length > 0
 
   const cwdName = hasCwd
@@ -82,18 +83,6 @@ export function RightSidebarPane({ onActivateFile, onActivateFolder, onChangeCwd
     if (selected?.[0]) {
       await onChangeCwd(selected[0])
     }
-  }
-
-  const refreshFolder = async () => {
-    if (isWebLocalPath(currentCwd)) {
-      const allowed = await ensureWebLocalFolderAccess()
-
-      if (!allowed) {
-        return
-      }
-    }
-
-    await refreshRoot()
   }
 
   const previewFile = async (path: string) => {
@@ -143,7 +132,7 @@ export function RightSidebarPane({ onActivateFile, onActivateFolder, onChangeCwd
           onLoadChildren={loadChildren}
           onNodeOpenChange={setNodeOpen}
           onPreviewFile={previewFile}
-          onRefresh={() => void refreshFolder()}
+          onRefresh={() => void refreshRoot()}
           openState={openState}
         />
       )}

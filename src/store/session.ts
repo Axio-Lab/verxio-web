@@ -3,7 +3,9 @@ import { atom } from 'nanostores'
 import type { ContextSuggestion } from '@/app/types'
 import type { HermesConnection } from '@/global'
 import type { ChatMessage } from '@/lib/chat-messages'
+import { isVerxioWeb } from '@/lib/platform'
 import { persistString, storedString } from '@/lib/storage'
+import { isWebLocalPath } from '@/lib/web-local-fs'
 import type { SessionInfo, UsageStats } from '@/types/hermes'
 
 type Updater<T> = T | ((current: T) => T)
@@ -137,7 +139,22 @@ export const setCurrentFastMode = (next: Updater<boolean>) => updateAtom($curren
 export const setYoloActive = (next: Updater<boolean>) => updateAtom($yoloActive, next)
 
 export const setCurrentCwd = (next: Updater<string>) => {
-  updateAtom($currentCwd, next)
+  updateAtom($currentCwd, current => {
+    const resolved = typeof next === 'function' ? next(current) : next
+
+    if (isVerxioWeb()) {
+      const currentTrimmed = current.trim()
+      const nextTrimmed = resolved.trim()
+
+      // The gateway reports the agent's server-side cwd (e.g. verxio-web/).
+      // Keep the browser-granted folder as the UI workspace for browsing and @ refs.
+      if (isWebLocalPath(currentTrimmed) && nextTrimmed && !isWebLocalPath(nextTrimmed)) {
+        return currentTrimmed
+      }
+    }
+
+    return resolved
+  })
   // Keep localStorage in sync with the atom: a real folder is remembered, an
   // empty cwd clears the key (|| null → removeItem).
   persistString(WORKSPACE_CWD_KEY, $currentCwd.get().trim() || null)
