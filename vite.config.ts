@@ -5,10 +5,6 @@ import tailwindcss from "@tailwindcss/vite";
 
 const BACKEND = process.env.HERMES_DASHBOARD_URL ?? "http://127.0.0.1:9119";
 
-/**
- * Hermes dashboard injects a session token into production index.html.
- * The Vite dev server must scrape and re-inject it or /api calls 401.
- */
 function hermesDevToken(): Plugin {
   const TOKEN_RE = /window\.__HERMES_SESSION_TOKEN__\s*=\s*"([^"]+)"/;
 
@@ -43,16 +39,32 @@ function hermesDevToken(): Plugin {
 }
 
 export default defineConfig({
+  base: "./",
   plugins: [react(), tailwindcss(), hermesDevToken()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      "@hermes/shared": path.resolve(
+      "@hermes/shared": path.resolve(__dirname, "./packages/shared/src/index.ts"),
+      react: path.resolve(__dirname, "node_modules/react"),
+      "react-dom": path.resolve(__dirname, "node_modules/react-dom"),
+      "react/jsx-dev-runtime": path.resolve(
         __dirname,
-        "../hermes-agent/apps/shared/src/index.ts",
+        "node_modules/react/jsx-dev-runtime.js",
+      ),
+      "react/jsx-runtime": path.resolve(
+        __dirname,
+        "node_modules/react/jsx-runtime.js",
       ),
     },
     dedupe: ["react", "react-dom"],
+  },
+  build: {
+    chunkSizeWarningLimit: 25000,
+    rolldownOptions: {
+      output: {
+        codeSplitting: false,
+      },
+    },
   },
   server: {
     host: "127.0.0.1",
