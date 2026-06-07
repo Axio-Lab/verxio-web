@@ -93,7 +93,14 @@ function buildWsUrl(path: string, params: Record<string, string>): string {
 
 function authHeaders(): HeadersInit {
   const token = getToken()
-  return token ? { Authorization: `Bearer ${token}` } : {}
+  if (!token) {
+    return {}
+  }
+
+  return {
+    Authorization: `Bearer ${token}`,
+    'X-Hermes-Session-Token': token
+  }
 }
 
 async function fetchJson<T>(url: string, init: RequestInit & { timeoutMs?: number } = {}): Promise<T> {
@@ -396,9 +403,36 @@ export function installWebBridge(): void {
     revealLogs: async () => ({ ok: false, path: '', error: 'Logs are on the Verxio host machine.' }),
     getRecentLogs: async () => ({ path: '', lines: [] }),
     readDir: async (dirPath: string) => {
+      const params = new URLSearchParams({ path: dirPath })
+      const url = buildApiUrl(`/api/fs/readdir?${params.toString()}`)
+
       try {
-        const params = new URLSearchParams({ path: dirPath })
-        return await fetchJson<HermesReadDirResult>(buildApiUrl(`/api/fs/readdir?${params.toString()}`))
+        const res = await fetch(url, { headers: authHeaders() })
+
+        if (!res.ok) {
+          const text = await res.text().catch(() => '')
+
+          if (res.status === 404 && text.includes('No such API endpoint')) {
+            return {
+              entries: [],
+              error: 'Restart the Verxio backend (hermes dashboard) to enable file browsing, then refresh this page.'
+            } satisfies HermesReadDirResult
+          }
+
+          if (res.status === 401) {
+            return {
+              entries: [],
+              error: 'Session expired. Refresh this page after the Verxio backend is running.'
+            } satisfies HermesReadDirResult
+          }
+
+          return {
+            entries: [],
+            error: text || `${res.status} ${res.statusText}`
+          } satisfies HermesReadDirResult
+        }
+
+        return (await res.json()) as HermesReadDirResult
       } catch (error) {
         return {
           entries: [],
