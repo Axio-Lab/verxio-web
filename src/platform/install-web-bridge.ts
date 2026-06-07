@@ -56,7 +56,7 @@ const previewListeners = new Set<Listener<HermesPreviewFileChanged>>()
 let bootProgress: DesktopBootProgress = {
   error: null,
   fakeMode: false,
-  message: 'Connecting to Hermes backend…',
+  message: 'Connecting to Verxio backend…',
   phase: 'backend.resolve',
   progress: 12,
   running: true,
@@ -142,19 +142,19 @@ async function waitForDashboardReady(): Promise<void> {
     }
     await new Promise(resolve => window.setTimeout(resolve, 500))
   }
-  throw new Error('Hermes dashboard is not reachable. Start it with: hermes dashboard --no-open')
+  throw new Error('Verxio backend is not reachable. Start it with: hermes dashboard --no-open')
 }
 
 async function getConnection(): Promise<HermesConnection> {
   await waitForDashboardReady()
   const token = getToken()
   if (!token) {
-    throw new Error('Missing Hermes session token. Restart hermes dashboard and reload.')
+    throw new Error('Missing Verxio session token. Restart hermes dashboard and reload.')
   }
 
   emitBoot({
     phase: 'backend.ready',
-    message: 'Hermes backend is ready',
+    message: 'Verxio backend is ready',
     progress: 94,
     running: true,
     error: null
@@ -393,7 +393,7 @@ export function installWebBridge(): void {
         return { dir }
       }
     },
-    revealLogs: async () => ({ ok: false, path: '', error: 'Logs are on the Hermes host machine.' }),
+    revealLogs: async () => ({ ok: false, path: '', error: 'Logs are on the Verxio host machine.' }),
     getRecentLogs: async () => ({ path: '', lines: [] }),
     readDir: async (dirPath: string) => {
       void dirPath
@@ -540,7 +540,7 @@ export function installWebBridge(): void {
           ok: false,
           manual: true,
           command: 'hermes update',
-          message: 'Run hermes update on the machine hosting the Hermes runtime.'
+          message: 'Run hermes update on the machine hosting the Verxio runtime.'
         }) satisfies DesktopUpdateApplyResult,
       getBranch: async () => ({ branch: 'main' }),
       setBranch: async (name: string) => ({ branch: name }),
@@ -552,7 +552,7 @@ export function installWebBridge(): void {
     .then(() => {
       emitBoot({
         phase: 'backend.ready',
-        message: 'Hermes backend is ready',
+        message: 'Verxio backend is ready',
         progress: 100,
         running: false,
         error: null

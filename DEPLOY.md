@@ -9,16 +9,16 @@ npm run build
 
 Output: `dist/`
 
-## Option A — Serve via Hermes dashboard (recommended)
+## Option A — Serve via Verxio backend (recommended)
 
-Point Hermes at the Verxio build:
+Point Verxio at the Verxio build:
 
 ```bash
 export HERMES_WEB_DIST=/absolute/path/to/verxio-web/dist
 hermes dashboard --no-open --skip-build --host 127.0.0.1 --port 9119
 ```
 
-Open `http://127.0.0.1:9119` — Verxio UI + Hermes API on one origin.
+Open `http://127.0.0.1:9119` — Verxio UI + Verxio API on one origin.
 
 ## Option B — Static host + API proxy
 
@@ -37,7 +37,7 @@ Inject `window.__HERMES_SESSION_TOKEN__` in `index.html` at deploy time, or enab
 
 ## Requirements
 
-- Hermes Agent `hermes dashboard` running (Python 3.11+)
+- Verxio `hermes dashboard` running (Python 3.11+)
 - Provider configured (`hermes setup` or onboarding in Verxio UI)
 - For terminal pane: POSIX PTY (macOS/Linux). Windows native dashboard PTY may require WSL.
 

@@ -158,7 +158,7 @@ function useApiKeyCatalog(): ApiKeyOption[] {
 }
 
 const PROVIDER_DISPLAY: Record<string, { order: number; title: string }> = {
-  nous: { order: 0, title: 'Nous Portal' },
+  nous: { order: 0, title: 'Subscription portal' },
   'openai-codex': { order: 1, title: 'OpenAI OAuth (ChatGPT)' },
   'minimax-oauth': { order: 2, title: 'MiniMax' },
   'qwen-oauth': { order: 3, title: 'Qwen Code' },
@@ -451,7 +451,7 @@ export function Picker({ ctx }: { ctx: OnboardingContext }) {
   const select = (p: OAuthProvider) => void startProviderOAuth(p, ctx)
   const featured = ordered.find(p => p.id === FEATURED_ID) ?? null
   const rest = featured ? ordered.filter(p => p.id !== FEATURED_ID) : ordered
-  // Collapse the secondary providers behind a disclosure only when Nous
+  // Collapse the secondary providers behind a disclosure only when the subscription provider
   // Portal is present to anchor the choice — otherwise show the full list.
   const collapsible = Boolean(featured) && rest.length > 0
   const showRest = !collapsible || showAll

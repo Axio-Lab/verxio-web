@@ -2,7 +2,7 @@
   "name": "verxio-web",
   "private": true,
   "version": "0.1.0",
-  "description": "Verxio web UI — browser shell over the Hermes Agent runtime.",
+  "description": "Verxio web UI — browser shell over the Verxio runtime.",
   "type": "module",
   "engines": {
     "node": "^20.19.0 || >=22.12.0"

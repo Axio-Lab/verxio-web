@@ -287,7 +287,7 @@ function shortLabel(type: HermesRefType, id: string): string {
 }
 
 /**
- * Renders text containing Hermes directives (`@file:...`, `@image:...`) as
+ * Renders text containing Verxio directives (`@file:...`, `@image:...`) as
  * inline chips. Embedded MEDIA images render below as a thumbnail row.
  */
 export function DirectiveContent({ text }: { text: string }) {

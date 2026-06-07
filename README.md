@@ -1,6 +1,6 @@
 # Verxio Web
 
-Browser product UI for **Verxio** — ported from [Hermes Desktop](https://github.com/NousResearch/hermes-agent/tree/main/apps/desktop). Talks to the **Hermes Agent** runtime via `hermes dashboard` (REST + WebSocket).
+Browser product UI for **Verxio** — built on the open agent runtime (upstream desktop app). Talks to the **Verxio** backend via `hermes dashboard` (REST + WebSocket).
 
 ## Architecture
 
@@ -13,14 +13,14 @@ Browser (verxio-web :5180 dev)
 ## Prerequisites
 
 - Node.js ≥ 20
-- [Hermes Agent](https://github.com/NousResearch/hermes-agent) clone with Python venv
+- Agent runtime clone with Python venv (`hermes-agent` repo)
 - `hermes dashboard` running
 
 ## Local development
 
 ```bash
-# Terminal 1 — Hermes backend
-cd ../hermes-agent   # or your hermes clone path
+# Terminal 1 — Verxio backend
+cd ../hermes-agent   # or your agent runtime clone path
 source venv/bin/activate
 hermes dashboard --no-open
 
@@ -55,7 +55,7 @@ See [IMPLEMENTATION_PLAN.md](./IMPLEMENTATION_PLAN.md). Phases 0–8 are complet
 
 | Repo | Role |
 |------|------|
-| [hermes-agent](https://github.com/NousResearch/hermes-agent) | AI engine |
+| [hermes-agent](https://github.com/NousResearch/hermes-agent) | Upstream AI engine (CLI: `hermes dashboard`) |
 | [verxio-api](https://github.com/Axio-Lab/verxio-api) | Optional BFF |
 
 ## License

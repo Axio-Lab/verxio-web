@@ -576,7 +576,7 @@
   animation: arc-border var(--arc-duration) linear infinite;
 }
 
-/* Flip the arc's travel direction (e.g. the Nous Portal hero row). */
+/* Flip the arc's travel direction (e.g. the subscription portal hero row). */
 .arc-border.arc-reverse::before {
   animation-direction: reverse;
 }

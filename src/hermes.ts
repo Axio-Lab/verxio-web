@@ -103,10 +103,10 @@ export type {
 export class HermesGateway extends JsonRpcGatewayClient {
   constructor() {
     super({
-      closedErrorMessage: 'Hermes gateway connection closed',
-      connectErrorMessage: 'Could not connect to Hermes gateway',
+      closedErrorMessage: 'Verxio gateway connection closed',
+      connectErrorMessage: 'Could not connect to Verxio gateway',
       createRequestId: nextId => nextId,
-      notConnectedErrorMessage: 'Hermes gateway is not connected',
+      notConnectedErrorMessage: 'Verxio gateway is not connected',
       requestTimeoutMs: DEFAULT_GATEWAY_REQUEST_TIMEOUT_MS
     })
   }
@@ -589,12 +589,12 @@ export function getGlobalModelOptions(): Promise<ModelOptionsResponse> {
 export interface RecommendedDefaultModel {
   provider: string
   model: string
-  /** True/false for Nous (free vs paid tier); null for other providers. */
+  /** True/false for subscription provider (free vs paid tier); null for other providers. */
   free_tier: boolean | null
 }
 
 // Recommended default model for a freshly-authenticated provider. Mirrors the
-// curation `hermes model` does — for Nous it honors the free/paid tier so a
+// curation `hermes model` does — for the subscription provider it honors the free/paid tier so a
 // free user gets a free model instead of a paid default.
 export function getRecommendedDefaultModel(provider: string): Promise<RecommendedDefaultModel> {
   return window.hermesDesktop.api<RecommendedDefaultModel>({
