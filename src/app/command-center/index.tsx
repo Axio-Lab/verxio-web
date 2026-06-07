@@ -6,14 +6,13 @@ import { PageLoader } from '@/components/page-loader'
 import { Button } from '@/components/ui/button'
 import { SearchField } from '@/components/ui/search-field'
 import { SegmentedControl } from '@/components/ui/segmented-control'
-import { getActionStatus, getLogs, getStatus, getUsageAnalytics, restartGateway, updateHermes } from '@/hermes'
-import type { ActionStatusResponse, AnalyticsResponse, StatusResponse } from '@/hermes'
+import { getUsageAnalytics } from '@/hermes'
+import type { AnalyticsResponse } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { sessionTitle } from '@/lib/chat-runtime'
-import { Activity, AlertCircle, BarChart3, Pin } from '@/lib/icons'
+import { AlertCircle, BarChart3, Pin } from '@/lib/icons'
 import { exportSession } from '@/lib/session-export'
 import { cn } from '@/lib/utils'
-import { upsertDesktopActionTask } from '@/store/activity'
 import { $pinnedSessionIds, pinSession, unpinSession } from '@/store/layout'
 import { $sessions, sessionPinId } from '@/store/session'
 
@@ -22,9 +21,9 @@ import { useRouteEnumParam } from '../hooks/use-route-enum-param'
 import { OverlayMain, OverlayNavItem, OverlaySidebar, OverlaySplitLayout } from '../overlays/overlay-split-layout'
 import { OverlayView } from '../overlays/overlay-view'
 
-export type CommandCenterSection = 'sessions' | 'system' | 'usage'
+export type CommandCenterSection = 'sessions' | 'usage'
 
-const SECTIONS = ['sessions', 'system', 'usage'] as const satisfies readonly CommandCenterSection[]
+const SECTIONS = ['sessions', 'usage'] as const satisfies readonly CommandCenterSection[]
 
 const USAGE_PERIODS = [7, 30, 90] as const
 type UsagePeriod = (typeof USAGE_PERIODS)[number]
@@ -115,11 +114,6 @@ export function CommandCenterView({ initialSection, onClose, onDeleteSession, on
   const [section, setSection] = useRouteEnumParam('section', SECTIONS, initialSection ?? 'sessions')
 
   const [query, setQuery] = useState('')
-  const [status, setStatus] = useState<StatusResponse | null>(null)
-  const [logs, setLogs] = useState<string[]>([])
-  const [systemLoading, setSystemLoading] = useState(false)
-  const [systemError, setSystemError] = useState('')
-  const [systemAction, setSystemAction] = useState<ActionStatusResponse | null>(null)
   const [usagePeriod, setUsagePeriod] = useState<UsagePeriod>(30)
   const [usage, setUsage] = useState<AnalyticsResponse | null>(null)
   const [usageLoading, setUsageLoading] = useState(false)
@@ -149,28 +143,6 @@ export function CommandCenterView({ initialSection, onClose, onDeleteSession, on
     })
   }, [debouncedQuery, sessions])
 
-  const refreshSystem = useCallback(async () => {
-    setSystemLoading(true)
-    setSystemError('')
-
-    try {
-      const [nextStatus, nextLogs] = await Promise.all([
-        getStatus(),
-        getLogs({
-          file: 'agent',
-          lines: 120
-        })
-      ])
-
-      setStatus(nextStatus)
-      setLogs(nextLogs.lines)
-    } catch (error) {
-      setSystemError(error instanceof Error ? error.message : String(error))
-    } finally {
-      setSystemLoading(false)
-    }
-  }, [])
-
   const refreshUsage = useCallback(async (days: UsagePeriod) => {
     const requestId = usageRequestRef.current + 1
     usageRequestRef.current = requestId
@@ -195,67 +167,18 @@ export function CommandCenterView({ initialSection, onClose, onDeleteSession, on
   }, [])
 
   useEffect(() => {
-    if (section === 'system' && !status && !systemLoading) {
-      void refreshSystem()
-    }
-  }, [refreshSystem, section, status, systemLoading])
-
-  useEffect(() => {
     if (section === 'usage') {
       void refreshUsage(usagePeriod)
     }
   }, [refreshUsage, section, usagePeriod])
 
   useRefreshHotkey(() => {
-    if (section === 'system') {
-      void refreshSystem()
-    } else if (section === 'usage') {
+    if (section === 'usage') {
       void refreshUsage(usagePeriod)
     }
   })
 
   const sessionListHasResults = filteredSessions.length > 0
-
-  const runSystemAction = useCallback(
-    async (kind: 'restart' | 'update') => {
-      setSystemError('')
-
-      try {
-        const started = kind === 'restart' ? await restartGateway() : await updateHermes()
-        let nextStatus: ActionStatusResponse | null = null
-
-        for (let attempt = 0; attempt < 18; attempt += 1) {
-          await new Promise(resolve => window.setTimeout(resolve, 1200))
-          const polled = await getActionStatus(started.name, 180)
-          nextStatus = polled
-          setSystemAction(polled)
-          upsertDesktopActionTask(polled)
-
-          if (!polled.running) {
-            break
-          }
-        }
-
-        if (!nextStatus) {
-          const pendingStatus = {
-            exit_code: null,
-            lines: [cc.actionStartedWaiting],
-            name: started.name,
-            pid: started.pid,
-            running: true
-          }
-
-          setSystemAction(pendingStatus)
-          upsertDesktopActionTask(pendingStatus)
-        }
-      } catch (error) {
-        setSystemError(error instanceof Error ? error.message : String(error))
-      } finally {
-        void refreshSystem()
-      }
-    },
-    [cc, refreshSystem]
-  )
 
   return (
     <OverlayView closeLabel={cc.close} onClose={onClose}>
@@ -264,7 +187,7 @@ export function CommandCenterView({ initialSection, onClose, onDeleteSession, on
           {SECTIONS.map(value => (
             <OverlayNavItem
               active={section === value}
-              icon={value === 'sessions' ? Pin : value === 'system' ? Activity : BarChart3}
+              icon={value === 'sessions' ? Pin : BarChart3}
               key={value}
               label={cc.sections[value]}
               onClick={() => setSection(value)}
@@ -356,7 +279,7 @@ export function CommandCenterView({ initialSection, onClose, onDeleteSession, on
                 </ul>
               )}
             </div>
-          ) : section === 'usage' ? (
+          ) : (
             <UsagePanel
               error={usageError}
               loading={usageLoading}
@@ -364,70 +287,6 @@ export function CommandCenterView({ initialSection, onClose, onDeleteSession, on
               period={usagePeriod}
               usage={usage}
             />
-          ) : (
-            <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-4">
-              <div className="border-b border-(--ui-stroke-tertiary) pb-4">
-                {status ? (
-                  <div className="grid gap-2">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={cn(
-                              'size-2 rounded-full',
-                              status.gateway_running ? 'bg-emerald-500' : 'bg-amber-500'
-                            )}
-                          />
-                          <span className="text-[length:var(--conversation-text-font-size)] font-medium text-foreground">
-                            {status.gateway_running ? cc.gatewayRunning : cc.gatewayStopped}
-                          </span>
-                        </div>
-                        <div className="mt-1 text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)">
-                          {cc.hermesActiveSessions(status.version, status.active_sessions)}
-                        </div>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-1.5 whitespace-nowrap">
-                        <Button onClick={() => void runSystemAction('restart')} size="xs" variant="text">
-                          {cc.restartMessaging}
-                        </Button>
-                        <Button onClick={() => void runSystemAction('update')} size="xs" variant="textStrong">
-                          {cc.updateHermes}
-                        </Button>
-                      </div>
-                    </div>
-                    {systemAction && (
-                      <div className="text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)">
-                        {systemAction.name} ·{' '}
-                        {systemAction.running
-                          ? cc.actionRunning
-                          : systemAction.exit_code === 0
-                            ? cc.actionDone
-                            : cc.actionFailed}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <PageLoader className="min-h-32" label={cc.loadingStatus} />
-                )}
-              </div>
-
-              <div className="flex min-h-0 flex-col">
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-[0.625rem] font-medium uppercase tracking-[0.08em] text-(--ui-text-tertiary)">
-                    {cc.recentLogs}
-                  </span>
-                  {systemError && (
-                    <span className="inline-flex items-center gap-1 text-[length:var(--conversation-caption-font-size)] text-destructive">
-                      <AlertCircle className="size-3.5" />
-                      {systemError}
-                    </span>
-                  )}
-                </div>
-                <pre className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap wrap-break-word rounded-lg border border-(--ui-stroke-tertiary) bg-(--ui-bg-quinary) p-3 font-mono text-[0.65rem] leading-relaxed text-(--ui-text-tertiary)">
-                  {logs.length ? logs.join('\n') : cc.noLogs}
-                </pre>
-              </div>
-            </div>
           )}
         </OverlayMain>
       </OverlaySplitLayout>

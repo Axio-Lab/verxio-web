@@ -1,11 +1,24 @@
 import type { ReactNode } from 'react'
 
 import { useI18n } from '@/i18n'
+import { formatCombo } from '@/lib/keybinds/combo'
 
 import { COMPLETION_DRAWER_CLASS } from './completion-drawer'
 
 const COMMON_COMMAND_KEYS = ['/help', '/clear', '/resume', '/details', '/copy', '/quit']
-const HOTKEY_KEYS = ['@', '/', '?', 'Enter', 'Cmd/Ctrl+Shift+K', 'Cmd/Ctrl+/', 'Esc', '↑ / ↓']
+
+const HOTKEY_ROWS = [
+  { key: '@', descKey: '@' },
+  { key: '/', descKey: '/' },
+  { key: '?', descKey: '?' },
+  { key: formatCombo('enter'), descKey: 'enter' },
+  { key: formatCombo('shift+enter'), descKey: 'shift+enter' },
+  { key: formatCombo('mod+enter'), descKey: 'mod+enter' },
+  { key: formatCombo('mod+shift+k'), descKey: 'mod+shift+k' },
+  { key: formatCombo('mod+/'), descKey: 'mod+/' },
+  { key: 'Esc', descKey: 'escape' },
+  { key: '↑ / ↓', descKey: 'history' }
+] as const
 
 export function HelpHint() {
   const { t } = useI18n()
@@ -20,8 +33,8 @@ export function HelpHint() {
       </Section>
 
       <Section title={c.hotkeys}>
-        {HOTKEY_KEYS.map(key => (
-          <Row description={c.hotkeyDescs[key] ?? ''} key={key} keyLabel={key} />
+        {HOTKEY_ROWS.map(row => (
+          <Row description={c.hotkeyDescs[row.descKey] ?? ''} key={row.descKey} keyLabel={row.key} />
         ))}
       </Section>
 

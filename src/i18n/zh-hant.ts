@@ -696,10 +696,9 @@ export const zhHant = defineLocale({
     settingsFields: '設定欄位',
     mcpServers: 'MCP 伺服器',
     archivedChats: '已封存聊天',
-    sections: { sessions: '工作階段', system: '系統', usage: '使用量' },
+    sections: { sessions: '工作階段', usage: '使用量' },
     sectionDescriptions: {
       sessions: '搜尋和管理工作階段',
-      system: '狀態、記錄和系統動作',
       usage: '一段時間內的詞元、費用和技能活動'
     },
     nav: {
@@ -711,7 +710,6 @@ export const zhHant = defineLocale({
     },
     sectionEntries: {
       sessions: { title: '工作階段面板', detail: '搜尋、釘選和管理工作階段' },
-      system: { title: '系統面板', detail: '閘道狀態、記錄、重新啟動/更新' },
       usage: { title: '使用量面板', detail: '詞元、費用和技能活動' }
     },
     providerNavigate: '導覽',
@@ -1490,6 +1488,10 @@ export const zhHant = defineLocale({
       branch: branch => `分支 ${branch}`,
       closeCommandCenter: '關閉命令中心',
       openCommandCenter: '開啟命令中心',
+      status: '狀態',
+      statusConnected: '已連線至 Verxio 伺服器',
+      statusConnecting: '正在連線至 Verxio 伺服器…',
+      statusDisconnected: '未連線至 Verxio 伺服器',
       gateway: '閘道',
       gatewayReady: '就緒',
       gatewayNeedsSetup: '需要設定',

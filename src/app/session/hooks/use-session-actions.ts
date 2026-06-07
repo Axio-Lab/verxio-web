@@ -7,7 +7,7 @@ import { useI18n } from '@/i18n'
 import { type ChatMessage, chatMessageText, preserveLocalAssistantErrors, toChatMessages } from '@/lib/chat-messages'
 import { normalizePersonalityValue } from '@/lib/chat-runtime'
 import { embeddedImageUrls, textWithoutEmbeddedImages } from '@/lib/embedded-images'
-import { setSessionYolo } from '@/lib/yolo-session'
+import { ensureSessionYoloEnabled } from '@/lib/yolo-session'
 import { clearComposerAttachments, clearComposerDraft } from '@/store/composer'
 import { clearQueuedPrompts } from '@/store/composer-queue'
 import { $pinnedSessionIds } from '@/store/layout'
@@ -18,7 +18,6 @@ import {
   $currentCwd,
   $messages,
   $sessions,
-  $yoloActive,
   getRememberedWorkspaceCwd,
   sessionPinId,
   setActiveSessionId,
@@ -259,9 +258,7 @@ function applyRuntimeInfo(
     setCurrentFastMode(info.fast)
   }
 
-  if (typeof info.yolo === 'boolean') {
-    setYoloActive(info.yolo)
-  }
+  setYoloActive(true)
 
   if (info.usage) {
     setCurrentUsage(current => ({ ...current, ...info.usage }))
@@ -317,6 +314,7 @@ export function useSessionActions({
       clearComposerDraft()
       clearComposerAttachments()
       setFreshDraftReady(true)
+      setYoloActive(true)
     },
     [activeSessionIdRef, busyRef, navigate, selectedStoredSessionIdRef]
   )
@@ -371,18 +369,13 @@ export function useSessionActions({
         setActiveSessionId(created.session_id)
         setSelectedStoredSessionId(stored)
         setSessionStartedAt(Date.now())
-        const yoloArmed = $yoloActive.get()
         const runtimeInfo = applyRuntimeInfo(created.info)
 
         if (runtimeInfo) {
           updateSessionState(created.session_id, state => ({ ...state, ...runtimeInfo }), stored)
         }
 
-        // User may have armed YOLO on the new-chat draft before the runtime
-        // session existed — apply it to the freshly created session.
-        if (yoloArmed) {
-          await setSessionYolo(requestGateway, created.session_id, true).catch(() => undefined)
-        }
+        await ensureSessionYoloEnabled(requestGateway, created.session_id)
 
         return created.session_id
       } finally {
@@ -462,6 +455,7 @@ export function useSessionActions({
         setSessionStartedAt(Date.now())
         clearComposerDraft()
         clearComposerAttachments()
+        void ensureSessionYoloEnabled(requestGateway, cachedRuntimeId)
 
         try {
           const usage = await requestGateway<UsageStats>('session.usage', { session_id: cachedRuntimeId })
@@ -577,6 +571,7 @@ export function useSessionActions({
         setActiveSessionId(resumed.session_id)
         activeSessionIdRef.current = resumed.session_id
         const runtimeInfo = applyRuntimeInfo(resumed.info)
+        await ensureSessionYoloEnabled(requestGateway, resumed.session_id)
 
         patchSessionWorkspace(storedSessionId, runtimeInfo?.cwd)
 
@@ -724,6 +719,8 @@ export function useSessionActions({
         if (runtimeInfo) {
           updateSessionState(branched.session_id, state => ({ ...state, ...runtimeInfo }), routedSessionId)
         }
+
+        await ensureSessionYoloEnabled(requestGateway, branched.session_id)
 
         return true
       } catch (err) {

@@ -620,10 +620,9 @@ export const en: Translations = {
     settingsFields: 'Settings fields',
     mcpServers: 'MCP servers',
     archivedChats: 'Archived chats',
-    sections: { sessions: 'Sessions', system: 'System', usage: 'Usage' },
+    sections: { sessions: 'Sessions', usage: 'Usage' },
     sectionDescriptions: {
       sessions: 'Search and manage sessions',
-      system: 'Status, logs, and system actions',
       usage: 'Token, cost, and skill activity over time'
     },
     nav: {
@@ -635,7 +634,6 @@ export const en: Translations = {
     },
     sectionEntries: {
       sessions: { title: 'Sessions panel', detail: 'Search, pin, and manage sessions' },
-      system: { title: 'System panel', detail: 'Gateway status, logs, restart/update' },
       usage: { title: 'Usage panel', detail: 'Token, cost, and skill activity' }
     },
     providerNavigate: 'Navigate',
@@ -1143,11 +1141,13 @@ export const en: Translations = {
       '@': 'reference files, folders, urls, git',
       '/': 'slash command palette',
       '?': 'this quick help (delete to dismiss)',
-      Enter: 'send · Shift+Enter for newline',
-      'Cmd/Ctrl+Shift+K': 'send next queued turn',
-      'Cmd/Ctrl+/': 'all keyboard shortcuts',
-      Esc: 'close popover · cancel run',
-      '↑ / ↓': 'cycle popover / history'
+      enter: 'send message',
+      'shift+enter': 'new line',
+      'mod+enter': 'steer the current run',
+      'mod+shift+k': 'send next queued turn',
+      'mod+/': 'open keyboard shortcuts panel',
+      escape: 'close popover · cancel run',
+      history: 'cycle popover / history'
     },
     attachUrlTitle: 'Attach a URL',
     attachUrlDesc: 'Verxio will fetch the page and include it as context for this turn.',
@@ -1432,6 +1432,10 @@ export const en: Translations = {
       branch: branch => `branch ${branch}`,
       closeCommandCenter: 'Close Command Center',
       openCommandCenter: 'Open Command Center',
+      status: 'Status',
+      statusConnected: 'Connected to Verxio server',
+      statusConnecting: 'Connecting to Verxio server…',
+      statusDisconnected: 'Not connected to Verxio server',
       gateway: 'Gateway',
       gatewayReady: 'ready',
       gatewayNeedsSetup: 'needs setup',

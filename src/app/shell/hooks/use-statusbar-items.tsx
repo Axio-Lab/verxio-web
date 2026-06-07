@@ -1,47 +1,29 @@
 import { useStore } from '@nanostores/react'
 import type { ReactNode } from 'react'
-import { useCallback, useMemo } from 'react'
+import { useMemo } from 'react'
 
-import type { CommandCenterSection } from '@/app/command-center'
-import { GatewayMenuPanel } from '@/app/shell/gateway-menu-panel'
-import {
-  Activity,
-  AlertCircle,
-  ChevronDown,
-  Clock,
-  Command,
-  Hash,
-  Loader2,
-  Sparkles,
-  Zap,
-  ZapFilled
-} from '@/lib/icons'
+import { AlertCircle, ChevronDown, Clock, Hash, Loader2, MonitorPlay, Plug, PlugOff, Sparkles } from '@/lib/icons'
 import { useI18n } from '@/i18n'
 import { formatModelStatusLabel } from '@/lib/model-status-label'
-import type { RuntimeReadinessResult } from '@/lib/runtime-readiness'
 import { contextBarLabel, LiveDuration, usageContextLabel } from '@/lib/statusbar'
 import { cn } from '@/lib/utils'
-import { setSessionYolo } from '@/lib/yolo-session'
 import { $desktopActionTasks } from '@/store/activity'
 import { $previewServerRestartStatus } from '@/store/preview'
 import {
-  $activeSessionId,
   $busy,
   $currentFastMode,
   $currentModel,
   $currentProvider,
   $currentReasoningEffort,
   $currentUsage,
+  $gatewayState,
   $sessionStartedAt,
   $turnStartedAt,
   $workingSessionIds,
-  $yoloActive,
-  setModelPickerOpen,
-  setYoloActive
+  setModelPickerOpen
 } from '@/store/session'
 import { $subagentsBySession, activeSubagentCount } from '@/store/subagents'
 import { $desktopVersion, $updateApply, $updateStatus, setUpdateOverlayOpen } from '@/store/updates'
-import type { StatusResponse } from '@/types/hermes'
 
 import { CRON_ROUTE } from '../../routes'
 import type { StatusbarItem } from '../statusbar-controls'
@@ -51,15 +33,8 @@ interface StatusbarItemsOptions {
   commandCenterOpen: boolean
   extraLeftItems: readonly StatusbarItem[]
   extraRightItems: readonly StatusbarItem[]
-  gatewayLogLines: readonly string[]
-  gatewayState: string
-  inferenceStatus: RuntimeReadinessResult | null
   modelMenuContent?: ReactNode
   openAgents: () => void
-  openCommandCenterSection: (section: CommandCenterSection) => void
-  freshDraftReady: boolean
-  requestGateway: <T = unknown>(method: string, params?: Record<string, unknown>) => Promise<T>
-  statusSnapshot: StatusResponse | null
   toggleCommandCenter: () => void
 }
 
@@ -68,22 +43,14 @@ export function useStatusbarItems({
   commandCenterOpen,
   extraLeftItems,
   extraRightItems,
-  gatewayLogLines,
-  gatewayState,
-  inferenceStatus,
   modelMenuContent,
   openAgents,
-  openCommandCenterSection,
-  freshDraftReady,
-  requestGateway,
-  statusSnapshot,
   toggleCommandCenter
 }: StatusbarItemsOptions) {
   const { t } = useI18n()
   const copy = t.shell.statusbar
-  const activeSessionId = useStore($activeSessionId)
-  const yoloActive = useStore($yoloActive)
   const busy = useStore($busy)
+  const gatewayState = useStore($gatewayState)
   const currentFastMode = useStore($currentFastMode)
   const currentModel = useStore($currentModel)
   const currentProvider = useStore($currentProvider)
@@ -101,41 +68,6 @@ export function useStatusbarItems({
 
   const contextUsage = useMemo(() => usageContextLabel(currentUsage), [currentUsage])
   const contextBar = useMemo(() => contextBarLabel(currentUsage), [currentUsage])
-
-  // Per-session approval bypass (same scope as the TUI's Shift+Tab). On a
-  // new-chat draft (no runtime session yet) we arm locally; the session-create
-  // path applies it once the backend session exists.
-  const toggleYolo = useCallback(async () => {
-    const next = !$yoloActive.get()
-    const sid = $activeSessionId.get()
-
-    setYoloActive(next)
-
-    if (!sid) {
-      return
-    }
-
-    try {
-      await setSessionYolo(requestGateway, sid, next)
-    } catch {
-      setYoloActive(!next)
-    }
-  }, [requestGateway])
-
-  const showYoloToggle = gatewayState === 'open' && (!!activeSessionId || freshDraftReady)
-
-  const gatewayMenuContent = useMemo(
-    () => (
-      <GatewayMenuPanel
-        gatewayState={gatewayState}
-        inferenceStatus={inferenceStatus}
-        logLines={gatewayLogLines}
-        onOpenSystem={() => openCommandCenterSection('system')}
-        statusSnapshot={statusSnapshot}
-      />
-    ),
-    [gatewayLogLines, gatewayState, inferenceStatus, openCommandCenterSection, statusSnapshot]
-  )
 
   const { bgFailed, bgRunning, subagentsRunning } = useMemo(() => {
     const actions = Object.values(desktopActionTasks)
@@ -156,29 +88,13 @@ export function useStatusbarItems({
     }
   }, [desktopActionTasks, previewServerRestartStatus, subagentsBySession, workingSessionIds])
 
-  const gatewayOpen = gatewayState === 'open'
-  const gatewayConnecting = gatewayState === 'connecting'
-  const inferenceReady = gatewayOpen && inferenceStatus?.ready === true
-  const gatewayDegraded = gatewayOpen || gatewayConnecting
+  const serverConnected = gatewayState === 'open'
+  const serverConnecting = gatewayState === 'connecting'
 
-  const gatewayDetail = gatewayOpen
-    ? inferenceStatus?.ready
-      ? copy.gatewayReady
-      : inferenceStatus
-        ? copy.gatewayNeedsSetup
-        : copy.gatewayChecking
-    : gatewayConnecting
-      ? copy.gatewayConnecting
-      : copy.gatewayOffline
-
-  const gatewayClassName = inferenceReady
-    ? undefined
-    : gatewayDegraded
-      ? 'text-amber-600 hover:text-amber-600'
-      : 'text-destructive hover:text-destructive'
+  const hideVersionBadge = desktopVersion?.platform === 'web'
 
   const versionItem = useMemo<StatusbarItem>(() => {
-    const appVersion = desktopVersion?.appVersion
+    const appVersion = hideVersionBadge ? null : desktopVersion?.appVersion
     const sha = updateStatus?.currentSha?.slice(0, 7) ?? null
     const behind = updateStatus?.behind ?? 0
     const applying = updateApply.applying || updateApply.stage === 'restart'
@@ -204,7 +120,7 @@ export function useStatusbarItems({
     return {
       className: !applying && behind > 0 ? 'text-primary hover:text-primary' : undefined,
       detail: appVersion && sha && !applying ? sha : undefined,
-      hidden: !appVersion && !sha,
+      hidden: hideVersionBadge || (!appVersion && !sha),
       icon: applying ? <Loader2 className="size-3 animate-spin" /> : <Hash className="size-3" />,
       id: 'version',
       label,
@@ -214,6 +130,7 @@ export function useStatusbarItems({
     }
   }, [
     desktopVersion?.appVersion,
+    hideVersionBadge,
     copy,
     updateApply.applying,
     updateApply.message,
@@ -227,22 +144,27 @@ export function useStatusbarItems({
     () => [
       {
         className: `w-7 justify-center px-0${commandCenterOpen ? ' bg-accent/55 text-foreground' : ''}`,
-        icon: <Command className="size-3.5" />,
+        icon: <MonitorPlay className="size-3.5" />,
         id: 'command-center',
         onSelect: toggleCommandCenter,
         title: commandCenterOpen ? copy.closeCommandCenter : copy.openCommandCenter,
         variant: 'action'
       },
       {
-        className: gatewayClassName,
-        detail: gatewayDetail,
-        icon: inferenceReady ? <Activity className="size-3" /> : <AlertCircle className="size-3" />,
-        id: 'gateway-health',
-        label: copy.gateway,
-        menuClassName: 'w-72',
-        menuContent: gatewayMenuContent,
-        title: inferenceStatus?.reason || copy.gatewayTitle,
-        variant: 'menu'
+        className: serverConnected
+          ? 'text-emerald-500'
+          : serverConnecting
+            ? 'text-amber-500'
+            : 'text-muted-foreground/45',
+        icon: serverConnected ? <Plug className="size-3.5" /> : <PlugOff className="size-3.5" />,
+        id: 'connection-status',
+        label: copy.status,
+        title: serverConnected
+          ? copy.statusConnected
+          : serverConnecting
+            ? copy.statusConnecting
+            : copy.statusDisconnected,
+        variant: 'text'
       },
       {
         className: cn(
@@ -286,12 +208,9 @@ export function useStatusbarItems({
       bgRunning,
       commandCenterOpen,
       copy,
-      gatewayMenuContent,
-      gatewayClassName,
-      gatewayDetail,
-      inferenceReady,
-      inferenceStatus?.reason,
       openAgents,
+      serverConnected,
+      serverConnecting,
       subagentsRunning,
       toggleCommandCenter
     ]
@@ -323,19 +242,6 @@ export function useStatusbarItems({
         label: copy.session,
         title: copy.runtimeSessionElapsed,
         variant: 'text'
-      },
-      {
-        className: cn('px-1', yoloActive && 'bg-(--chrome-action-hover)'),
-        hidden: !showYoloToggle,
-        icon: yoloActive ? (
-          <ZapFilled className="size-3.5 shrink-0" />
-        ) : (
-          <Zap className="size-3.5 shrink-0 opacity-70" />
-        ),
-        id: 'yolo',
-        onSelect: () => void toggleYolo(),
-        title: yoloActive ? copy.yoloOn : copy.yoloOff,
-        variant: 'action'
       },
       {
         id: 'model-summary',
@@ -381,11 +287,8 @@ export function useStatusbarItems({
       currentReasoningEffort,
       modelMenuContent,
       sessionStartedAt,
-      showYoloToggle,
-      toggleYolo,
       turnStartedAt,
-      versionItem,
-      yoloActive
+      versionItem
     ]
   )
 

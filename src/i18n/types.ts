@@ -528,10 +528,10 @@ export interface Translations {
     settingsFields: string
     mcpServers: string
     archivedChats: string
-    sections: Record<'sessions' | 'system' | 'usage', string>
-    sectionDescriptions: Record<'sessions' | 'system' | 'usage', string>
+    sections: Record<'sessions' | 'usage', string>
+    sectionDescriptions: Record<'sessions' | 'usage', string>
     nav: Record<'newChat' | 'settings' | 'skills' | 'messaging' | 'artifacts', { title: string; detail: string }>
-    sectionEntries: Record<'sessions' | 'system' | 'usage', { title: string; detail: string }>
+    sectionEntries: Record<'sessions' | 'usage', { title: string; detail: string }>
     providerNavigate: string
     providerSessions: string
     refresh: string
@@ -1105,6 +1105,10 @@ export interface Translations {
       branch: (branch: string) => string
       closeCommandCenter: string
       openCommandCenter: string
+      status: string
+      statusConnected: string
+      statusConnecting: string
+      statusDisconnected: string
       gateway: string
       gatewayReady: string
       gatewayNeedsSetup: string

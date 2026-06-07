@@ -720,10 +720,9 @@ export const ja = defineLocale({
     settingsFields: '設定フィールド',
     mcpServers: 'MCP サーバー',
     archivedChats: 'アーカイブ済みチャット',
-    sections: { sessions: 'セッション', system: 'システム', usage: '使用状況' },
+    sections: { sessions: 'セッション', usage: '使用状況' },
     sectionDescriptions: {
       sessions: 'セッションの検索と管理',
-      system: 'ステータス、ログ、システムアクション',
       usage: 'トークン、コスト、スキルの活動履歴'
     },
     nav: {
@@ -735,7 +734,6 @@ export const ja = defineLocale({
     },
     sectionEntries: {
       sessions: { title: 'セッションパネル', detail: 'セッションの検索、ピン留め、管理' },
-      system: { title: 'システムパネル', detail: 'ゲートウェイのステータス、ログ、再起動/更新' },
       usage: { title: '使用状況パネル', detail: 'トークン、コスト、スキルの活動' }
     },
     providerNavigate: 'ナビゲート',
@@ -1541,6 +1539,10 @@ export const ja = defineLocale({
       branch: branch => `ブランチ ${branch}`,
       closeCommandCenter: 'コマンドセンターを閉じる',
       openCommandCenter: 'コマンドセンターを開く',
+      status: 'ステータス',
+      statusConnected: 'Verxio サーバーに接続済み',
+      statusConnecting: 'Verxio サーバーに接続中…',
+      statusDisconnected: 'Verxio サーバーに未接続',
       gateway: 'ゲートウェイ',
       gatewayReady: '準備完了',
       gatewayNeedsSetup: '設定が必要',

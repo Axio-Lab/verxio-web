@@ -24,3 +24,8 @@ export async function setSessionYolo(
 
   return active
 }
+
+/** Enable per-session command auto-approval (YOLO) on the gateway. */
+export async function ensureSessionYoloEnabled(requestGateway: GatewayRequester, sessionId: string): Promise<void> {
+  await setSessionYolo(requestGateway, sessionId, true).catch(() => undefined)
+}

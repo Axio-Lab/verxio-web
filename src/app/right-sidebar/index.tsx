@@ -8,6 +8,7 @@ import { useI18n } from '@/i18n'
 import { Loader } from '@/components/ui/loader'
 import { Tip } from '@/components/ui/tooltip'
 import { normalizeOrLocalPreviewTarget } from '@/lib/local-preview'
+import { isVerxioWeb } from '@/lib/platform'
 import { cn } from '@/lib/utils'
 import { $panesFlipped } from '@/store/layout'
 import { notifyError } from '@/store/notifications'
@@ -68,7 +69,15 @@ export function RightSidebarPane({ onActivateFile, onActivateFolder, onChangeCwd
   } = useProjectTree(currentCwd)
 
   const canCollapse = Object.values(openState).some(Boolean)
-  const effectiveTab: RightSidebarTabId = terminalTakeover ? 'files' : activeTab
+  const webMode = isVerxioWeb()
+
+  const effectiveTab: RightSidebarTabId = terminalTakeover
+    ? webMode
+      ? 'terminal'
+      : 'files'
+    : webMode
+      ? 'terminal'
+      : activeTab
 
   const chooseFolder = async () => {
     const selected = await window.hermesDesktop?.selectPaths({
@@ -97,7 +106,11 @@ export function RightSidebarPane({ onActivateFile, onActivateFolder, onChangeCwd
     }
   }
 
-  const tabs = terminalTakeover ? RIGHT_SIDEBAR_TABS.filter(tab => tab.id !== 'terminal') : RIGHT_SIDEBAR_TABS
+  const tabs = webMode
+    ? RIGHT_SIDEBAR_TABS.filter(tab => tab.id === 'terminal')
+    : terminalTakeover
+      ? RIGHT_SIDEBAR_TABS.filter(tab => tab.id !== 'terminal')
+      : RIGHT_SIDEBAR_TABS
 
   return (
     <aside

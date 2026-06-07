@@ -774,10 +774,9 @@ export const zh: Translations = {
     settingsFields: '设置字段',
     mcpServers: 'MCP 服务器',
     archivedChats: '已归档对话',
-    sections: { sessions: '会话', system: '系统', usage: '用量' },
+    sections: { sessions: '会话', usage: '用量' },
     sectionDescriptions: {
       sessions: '搜索与管理会话',
-      system: '状态、日志与系统操作',
       usage: '一段时间内的词元、成本与技能活动'
     },
     nav: {
@@ -789,7 +788,6 @@ export const zh: Translations = {
     },
     sectionEntries: {
       sessions: { title: '会话面板', detail: '搜索、置顶与管理会话' },
-      system: { title: '系统面板', detail: '网关状态、日志、重启/更新' },
       usage: { title: '用量面板', detail: '词元、成本与技能活动' }
     },
     providerNavigate: '导航',
@@ -1576,6 +1574,10 @@ export const zh: Translations = {
       branch: branch => `分支 ${branch}`,
       closeCommandCenter: '关闭命令中心',
       openCommandCenter: '打开命令中心',
+      status: '状态',
+      statusConnected: '已连接到 Verxio 服务器',
+      statusConnecting: '正在连接 Verxio 服务器…',
+      statusDisconnected: '未连接到 Verxio 服务器',
       gateway: '网关',
       gatewayReady: '就绪',
       gatewayNeedsSetup: '需要设置',

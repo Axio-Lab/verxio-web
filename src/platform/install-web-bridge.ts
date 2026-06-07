@@ -103,11 +103,45 @@ function authHeaders(): HeadersInit {
   }
 }
 
-async function fetchJson<T>(url: string, init: RequestInit & { timeoutMs?: number } = {}): Promise<T> {
+const SESSION_TOKEN_RE = /window\.__HERMES_SESSION_TOKEN__\s*=\s*"([^"]+)"/
+const TOKEN_RELOAD_KEY = 'verxio.tokenReloadAttempted'
+
+function dashboardOrigin(): string {
+  const base = apiBaseUrl()
+  if (base) {
+    return base.replace(/\/$/, '')
+  }
+
+  return import.meta.env.VITE_HERMES_DASHBOARD_URL?.replace(/\/$/, '') ?? 'http://127.0.0.1:9119'
+}
+
+async function refreshSessionToken(): Promise<boolean> {
+  try {
+    const res = await fetch(`${dashboardOrigin()}/`, { headers: { accept: 'text/html' } })
+    const html = await res.text()
+    const match = html.match(SESSION_TOKEN_RE)
+
+    if (!match?.[1]) {
+      return false
+    }
+
+    window.__HERMES_SESSION_TOKEN__ = match[1]
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function requestJson<T>(
+  url: string,
+  init: RequestInit & { timeoutMs?: number },
+  options?: { allowUnauthorized?: boolean }
+): Promise<Response> {
   const controller = new AbortController()
   const timeout = window.setTimeout(() => controller.abort(), init.timeoutMs ?? 30_000)
+
   try {
-    const res = await fetch(url, {
+    return await fetch(url, {
       ...init,
       signal: controller.signal,
       headers: {
@@ -116,17 +150,61 @@ async function fetchJson<T>(url: string, init: RequestInit & { timeoutMs?: numbe
         ...(init.headers ?? {})
       }
     })
-    if (!res.ok) {
-      const text = await res.text().catch(() => '')
-      throw new Error(`${res.status}: ${text || res.statusText}`)
-    }
-    if (res.status === 204) {
-      return undefined as T
-    }
-    return (await res.json()) as T
   } finally {
     window.clearTimeout(timeout)
   }
+}
+
+async function fetchJson<T>(url: string, init: RequestInit & { timeoutMs?: number } = {}): Promise<T> {
+  let res = await requestJson(url, init)
+
+  if (res.status === 401) {
+    const refreshed = await refreshSessionToken()
+
+    if (refreshed) {
+      res = await requestJson(url, init)
+    }
+
+    if (res.status === 401) {
+      let alreadyReloaded = false
+
+      try {
+        alreadyReloaded = sessionStorage.getItem(TOKEN_RELOAD_KEY) === '1'
+      } catch {
+        /* privacy mode */
+      }
+
+      if (!alreadyReloaded) {
+        try {
+          sessionStorage.setItem(TOKEN_RELOAD_KEY, '1')
+        } catch {
+          /* privacy mode */
+        }
+
+        window.location.reload()
+        return new Promise<T>(() => {})
+      }
+    }
+  }
+
+  if (res.ok) {
+    try {
+      sessionStorage.removeItem(TOKEN_RELOAD_KEY)
+    } catch {
+      /* privacy mode */
+    }
+  }
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`${res.status}: ${text || res.statusText}`)
+  }
+
+  if (res.status === 204) {
+    return undefined as T
+  }
+
+  return (await res.json()) as T
 }
 
 function emitBoot(patch: Partial<DesktopBootProgress>) {
@@ -336,11 +414,16 @@ export function installWebBridge(): void {
       return false
     },
     requestMicrophoneAccess: async () => {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        return false
+      }
+
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
         stream.getTracks().forEach(track => track.stop())
         return true
-      } catch {
+      } catch (error) {
+        console.warn('[verxio] Microphone permission denied or unavailable:', error)
         return false
       }
     },
@@ -569,7 +652,7 @@ export function installWebBridge(): void {
     onBootstrapEvent: () => () => undefined,
     getVersion: async () =>
       ({
-        appVersion: '0.1.0',
+        appVersion: '',
         electronVersion: 'n/a',
         nodeVersion: 'n/a',
         platform: 'web',

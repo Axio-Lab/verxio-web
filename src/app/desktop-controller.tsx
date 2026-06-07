@@ -89,7 +89,8 @@ import { useSessionActions } from './session/hooks/use-session-actions'
 import { useSessionStateCache } from './session/hooks/use-session-state-cache'
 import { AppShell } from './shell/app-shell'
 import { useOverlayRouting } from './shell/hooks/use-overlay-routing'
-import { useStatusSnapshot } from './shell/hooks/use-status-snapshot'
+import { isVerxioWeb } from '@/lib/platform'
+
 import { useStatusbarItems } from './shell/hooks/use-statusbar-items'
 import { ModelMenuPanel } from './shell/model-menu-panel'
 import type { StatusbarItem } from './shell/statusbar-controls'
@@ -160,7 +161,6 @@ export function DesktopController() {
     cronOpen,
     currentView,
     openAgents,
-    openCommandCenterSection,
     profilesOpen,
     settingsOpen,
     toggleCommandCenter
@@ -296,8 +296,6 @@ export function DesktopController() {
       pinSession(pinId)
     }
   }, [])
-
-  const { gatewayLogLines, inferenceStatus, statusSnapshot } = useStatusSnapshot(gatewayState, requestGateway)
 
   const updateActiveSessionRuntimeInfo = useCallback(
     (info: { branch?: string; cwd?: string }) => {
@@ -589,15 +587,8 @@ export function DesktopController() {
     commandCenterOpen,
     extraLeftItems: statusbarItemGroups.flat.left,
     extraRightItems: statusbarItemGroups.flat.right,
-    gatewayLogLines,
-    gatewayState,
-    inferenceStatus,
     modelMenuContent,
     openAgents,
-    freshDraftReady,
-    openCommandCenterSection,
-    requestGateway,
-    statusSnapshot,
     toggleCommandCenter
   })
 
@@ -729,6 +720,7 @@ export function DesktopController() {
   // browser + preview rail → left. Same panes, swapped sides.
   const sidebarSide = panesFlipped ? 'right' : 'left'
   const railSide = panesFlipped ? 'left' : 'right'
+  const webMode = isVerxioWeb()
 
   const previewPane = (
     <Pane
@@ -830,8 +822,8 @@ export function DesktopController() {
         main | preview | file-browser. Flipped (rail on the left): mirror it to
         file-browser | preview | main so preview stays adjacent to the chat.
       */}
-      {panesFlipped ? fileBrowserPane : previewPane}
-      {panesFlipped ? previewPane : fileBrowserPane}
+      {panesFlipped ? (webMode ? null : fileBrowserPane) : previewPane}
+      {panesFlipped ? previewPane : webMode ? null : fileBrowserPane}
     </AppShell>
   )
 }
