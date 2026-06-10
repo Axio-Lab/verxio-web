@@ -53,6 +53,12 @@ export interface ComposioConnectedAccount {
   createdAt?: string
 }
 
+export interface ComposioToolPreview {
+  slug: string
+  name: string
+  description: string
+}
+
 export interface ComposioApp {
   slug: string
   name: string
@@ -60,6 +66,9 @@ export interface ComposioApp {
   logoUrl: string | null
   categories: string[]
   noAuth: boolean
+  toolsCount?: number | null
+  triggersCount?: number | null
+  sampleTools?: ComposioToolPreview[]
 }
 
 export interface ComposioConnectionsResponse {
@@ -69,6 +78,11 @@ export interface ComposioConnectionsResponse {
 
 export interface ComposioAppsResponse {
   apps: ComposioApp[]
+  configured: boolean
+}
+
+export interface ComposioAppToolsResponse {
+  tools: ComposioToolPreview[]
   configured: boolean
 }
 
@@ -157,6 +171,12 @@ export function listComposioConnections(): Promise<ComposioConnectionsResponse> 
 
 export function listComposioApps(): Promise<ComposioAppsResponse> {
   return verxioFetch<ComposioAppsResponse>('/api/composio/connections/apps')
+}
+
+export function listComposioAppTools(appSlug: string, limit = 4): Promise<ComposioAppToolsResponse> {
+  return verxioFetch<ComposioAppToolsResponse>(
+    `/api/composio/connections/apps/${encodeURIComponent(appSlug)}/tools?limit=${limit}`
+  )
 }
 
 export function initiateComposioConnection(appSlug: string): Promise<ComposioInitiateResponse> {
