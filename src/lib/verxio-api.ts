@@ -183,9 +183,9 @@ export function listComposioAppTools(appSlug: string, limit = 4): Promise<Compos
   )
 }
 
-export function initiateComposioConnection(appSlug: string): Promise<ComposioInitiateResponse> {
+export function initiateComposioConnection(appSlug: string, callbackUrl?: string): Promise<ComposioInitiateResponse> {
   return verxioFetch<ComposioInitiateResponse>('/api/composio/connections/initiate', {
-    body: JSON.stringify({ appSlug }),
+    body: JSON.stringify({ appSlug, callbackUrl }),
     method: 'POST'
   })
 }

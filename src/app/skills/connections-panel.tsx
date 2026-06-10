@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { PaginationControl } from '@/components/ui/pagination'
-import { AlertTriangle, CheckCircle2, ExternalLink, Loader2, Plug } from '@/lib/icons'
+import { AlertTriangle, CheckCircle2, ExternalLink, Loader2 } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import {
   type ComposioApp,
@@ -143,6 +144,8 @@ const FALLBACK_COMPOSIO_APPS: ComposioApp[] = [
   }
 ]
 
+const TOOLS_DIALOG_LIMIT = 50
+
 interface ConnectionsPanelProps {
   onPageChange: (page: number) => void
   page: number
@@ -158,7 +161,10 @@ export function ConnectionsPanel({ onPageChange, page, pageSize, query }: Connec
   const [message, setMessage] = useState<string | null>(null)
   const [connectingSlug, setConnectingSlug] = useState<string | null>(null)
   const [disconnectingId, setDisconnectingId] = useState<string | null>(null)
-  const [toolPreviewBySlug, setToolPreviewBySlug] = useState<Map<string, ComposioToolPreview[]>>(() => new Map())
+  const [toolsDialogApp, setToolsDialogApp] = useState<ComposioApp | null>(null)
+  const [toolsDialogItems, setToolsDialogItems] = useState<ComposioToolPreview[]>([])
+  const [toolsDialogLoading, setToolsDialogLoading] = useState(false)
+  const [toolsDialogError, setToolsDialogError] = useState<string | null>(null)
 
   const refreshConnections = useCallback(async () => {
     setLoading(true)
@@ -180,7 +186,7 @@ export function ConnectionsPanel({ onPageChange, page, pageSize, query }: Connec
               'Composio rejected the API key. Generate a fresh key in the Composio dashboard and update root .env.'
             : null
       )
-    } catch (err) {
+    } catch {
       setApps(FALLBACK_COMPOSIO_APPS)
       setAccounts([])
       setConfigured(false)
@@ -193,6 +199,44 @@ export function ConnectionsPanel({ onPageChange, page, pageSize, query }: Connec
   useEffect(() => {
     void refreshConnections()
   }, [refreshConnections])
+
+  useEffect(() => {
+    if (!toolsDialogApp) {
+      return
+    }
+
+    let cancelled = false
+
+    setToolsDialogLoading(true)
+    setToolsDialogError(null)
+    setToolsDialogItems(toolsDialogApp.sampleTools ?? [])
+
+    void listComposioAppTools(toolsDialogApp.slug, TOOLS_DIALOG_LIMIT)
+      .then(response => {
+        if (cancelled) {
+          return
+        }
+
+        setToolsDialogItems(response.tools.length > 0 ? response.tools : (toolsDialogApp.sampleTools ?? []))
+      })
+      .catch(err => {
+        if (cancelled) {
+          return
+        }
+
+        setToolsDialogError(err instanceof Error ? err.message : 'Could not load tools.')
+        setToolsDialogItems(toolsDialogApp.sampleTools ?? [])
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setToolsDialogLoading(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [toolsDialogApp])
 
   const accountByApp = useMemo(() => {
     const rows = new Map<string, ComposioConnectedAccount>()
@@ -232,54 +276,12 @@ export function ConnectionsPanel({ onPageChange, page, pageSize, query }: Connec
   const currentPage = Math.min(page, pageCount)
   const pageStart = (currentPage - 1) * pageSize
   const visibleApps = filteredApps.slice(pageStart, pageStart + pageSize)
-  const connectedCount = accounts.filter(account => isConnectedStatus(account.status)).length
-  const totalTools = filteredApps.reduce((total, app) => total + (app.toolsCount ?? 0), 0)
 
   useEffect(() => {
     if (page > pageCount) {
       onPageChange(pageCount)
     }
   }, [onPageChange, page, pageCount])
-
-  useEffect(() => {
-    const missingApps = visibleApps.filter(app => !app.sampleTools?.length && !toolPreviewBySlug.has(app.slug))
-
-    if (missingApps.length === 0) {
-      return
-    }
-
-    let cancelled = false
-
-    Promise.all(
-      missingApps.map(async app => {
-        try {
-          const response = await listComposioAppTools(app.slug)
-
-          return [app.slug, response.tools] as const
-        } catch {
-          return [app.slug, [] as ComposioToolPreview[]] as const
-        }
-      })
-    ).then(results => {
-      if (cancelled) {
-        return
-      }
-
-      setToolPreviewBySlug(current => {
-        const next = new Map(current)
-
-        for (const [slug, tools] of results) {
-          next.set(slug, tools)
-        }
-
-        return next
-      })
-    })
-
-    return () => {
-      cancelled = true
-    }
-  }, [toolPreviewBySlug, visibleApps])
 
   async function handleConnect(app: ComposioApp) {
     if (!configured) {
@@ -295,10 +297,16 @@ export function ConnectionsPanel({ onPageChange, page, pageSize, query }: Connec
     setConnectingSlug(app.slug)
 
     try {
-      const result = await initiateComposioConnection(app.slug)
+      const callbackUrl = `${window.location.origin}${window.location.pathname}#/skills`
+      const result = await initiateComposioConnection(app.slug, callbackUrl)
 
       if (result.redirectUrl) {
-        window.location.href = result.redirectUrl
+        window.open(result.redirectUrl, '_blank', 'noopener,noreferrer')
+        notify({
+          kind: 'info',
+          message: 'Finish authorization in the new tab, then return here and refresh connections.',
+          title: `${app.name} authorization`
+        })
 
         return
       }
@@ -327,17 +335,10 @@ export function ConnectionsPanel({ onPageChange, page, pageSize, query }: Connec
   }
 
   return (
-    <div className={cn('h-full overflow-y-auto py-3', PAGE_INSET_X)}>
-      <div className="space-y-3">
-        <div className="grid gap-2 lg:grid-cols-3">
-          <ConnectionMetric label="Connected" value={String(connectedCount)} />
-          <ConnectionMetric label="Toolkits" value={`${filteredApps.length} apps`} />
-          <ConnectionMetric label="Tools" value={totalTools > 0 ? `${totalTools}+` : 'Previews'} />
-          <ConnectionMetric label="Runtime" value="Composio MCP" />
-        </div>
-
+    <div className={cn('h-full min-w-0 overflow-y-auto overflow-x-hidden py-3', PAGE_INSET_X)}>
+      <div className="min-w-0 space-y-3">
         {message && (
-          <div className="flex items-start gap-2 rounded-[6px] border border-(--ui-stroke-secondary) bg-(--ui-bg-secondary) px-3 py-2 text-xs text-muted-foreground">
+          <div className="flex items-start gap-2 rounded-[6px] border border-(--ui-stroke-secondary) bg-(--ui-bg-secondary) px-3 py-2 text-xs break-words text-muted-foreground">
             <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
             <span>{message}</span>
           </div>
@@ -357,11 +358,10 @@ export function ConnectionsPanel({ onPageChange, page, pageSize, query }: Connec
           </div>
         ) : (
           <>
-            <div className="grid gap-2 lg:grid-cols-3">
+            <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {visibleApps.map(app => {
                 const account = accountByApp.get(normalizeSlug(app.slug))
                 const connected = account ? isConnectedStatus(account.status) : false
-                const tools = app.sampleTools?.length ? app.sampleTools : toolPreviewBySlug.get(app.slug) || []
 
                 return (
                   <ConnectionCard
@@ -373,8 +373,8 @@ export function ConnectionsPanel({ onPageChange, page, pageSize, query }: Connec
                     key={app.slug}
                     onConnect={() => void handleConnect(app)}
                     onDisconnect={account ? () => void handleDisconnect(app, account) : undefined}
+                    onViewTools={() => setToolsDialogApp(app)}
                     setupRequired={!configured}
-                    tools={tools}
                   />
                 )
               })}
@@ -390,15 +390,21 @@ export function ConnectionsPanel({ onPageChange, page, pageSize, query }: Connec
           </>
         )}
       </div>
-    </div>
-  )
-}
 
-function ConnectionMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-[6px] border border-primary/40 bg-white px-3 py-2 text-neutral-950">
-      <div className="text-[0.62rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{label}</div>
-      <div className="mt-1 truncate text-sm font-medium">{value}</div>
+      <ConnectionToolsDialog
+        app={toolsDialogApp}
+        error={toolsDialogError}
+        loading={toolsDialogLoading}
+        onOpenChange={open => {
+          if (!open) {
+            setToolsDialogApp(null)
+            setToolsDialogItems([])
+            setToolsDialogError(null)
+          }
+        }}
+        open={Boolean(toolsDialogApp)}
+        tools={toolsDialogItems}
+      />
     </div>
   )
 }
@@ -411,8 +417,8 @@ interface ConnectionCardProps {
   disconnecting: boolean
   onConnect: () => void
   onDisconnect?: () => void
+  onViewTools: () => void
   setupRequired: boolean
-  tools: ComposioToolPreview[]
 }
 
 function ConnectionCard({
@@ -423,19 +429,14 @@ function ConnectionCard({
   disconnecting,
   onConnect,
   onDisconnect,
-  setupRequired,
-  tools
+  onViewTools,
+  setupRequired
 }: ConnectionCardProps) {
   const disabled = connecting || disconnecting
-
-  const toolsLabel = app.toolsCount
-    ? `${app.toolsCount} tools`
-    : tools.length
-      ? `${tools.length} tool previews`
-      : 'Tools'
+  const toolCount = app.toolsCount ?? app.sampleTools?.length ?? 0
 
   return (
-    <div className="flex min-h-64 flex-col justify-between rounded-[6px] border border-primary/45 bg-white p-3 text-neutral-950">
+    <div className="flex min-h-48 min-w-0 flex-col justify-between rounded-[6px] border border-primary/45 bg-white p-3 text-neutral-950">
       <div className="min-w-0">
         <div className="flex items-start gap-2">
           {app.logoUrl ? (
@@ -460,30 +461,10 @@ function ConnectionCard({
             </div>
           </div>
         </div>
-        <p className="mt-3 max-h-10 overflow-hidden text-xs leading-5 text-muted-foreground">
+        <p className="mt-3 line-clamp-3 text-xs leading-5 text-muted-foreground">
           {app.description || 'Connect this data source for agent actions.'}
         </p>
-        <div className="mt-3 rounded-[5px] border border-primary/25 bg-white px-2 py-2">
-          <div className="mb-1 text-[0.62rem] font-semibold uppercase tracking-[0.12em] text-neutral-500">
-            {toolsLabel}
-          </div>
-          {tools.length > 0 ? (
-            <div className="space-y-1.5">
-              {tools.slice(0, 3).map(tool => (
-                <div className="min-w-0" key={tool.slug || tool.name}>
-                  <div className="truncate text-[0.72rem] font-medium text-neutral-800">{tool.name}</div>
-                  {tool.description ? (
-                    <div className="line-clamp-2 text-[0.68rem] leading-4 text-neutral-500">{tool.description}</div>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-[0.68rem] leading-4 text-neutral-500">
-              Tool preview loads from Composio when the API key is available.
-            </div>
-          )}
-        </div>
+        {toolCount > 0 ? <div className="mt-2 text-[0.68rem] text-neutral-500">{toolCount} available tools</div> : null}
         {app.categories.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-1">
             {app.categories.slice(0, 3).map(category => (
@@ -498,24 +479,111 @@ function ConnectionCard({
         )}
       </div>
 
-      <div className="mt-4 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1 text-[0.65rem] text-neutral-500">
-          <Plug className="size-3" />
-          Agent tools
-        </div>
+      <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:items-center sm:justify-end">
+        <Button
+          className="w-full min-w-0 sm:w-auto"
+          disabled={disabled}
+          onClick={onViewTools}
+          size="xs"
+          type="button"
+          variant="outline"
+        >
+          View tools
+        </Button>
         {connected && onDisconnect ? (
-          <Button disabled={disabled} onClick={onDisconnect} size="xs" type="button" variant="outline">
+          <Button
+            className="w-full min-w-0 sm:w-auto"
+            disabled={disabled}
+            onClick={onDisconnect}
+            size="xs"
+            type="button"
+            variant="outline"
+          >
             {disconnecting ? <Loader2 className="size-3 animate-spin" /> : null}
             Disconnect
           </Button>
         ) : (
-          <Button disabled={disabled} onClick={onConnect} size="xs" type="button" variant="secondary">
+          <Button
+            className="w-full min-w-0 sm:w-auto"
+            disabled={disabled}
+            onClick={onConnect}
+            size="xs"
+            type="button"
+            variant="secondary"
+          >
             {connecting ? <Loader2 className="size-3 animate-spin" /> : <ExternalLink className="size-3" />}
             Connect
           </Button>
         )}
       </div>
     </div>
+  )
+}
+
+function ConnectionToolsDialog({
+  app,
+  error,
+  loading,
+  onOpenChange,
+  open,
+  tools
+}: {
+  app: ComposioApp | null
+  error: string | null
+  loading: boolean
+  onOpenChange: (open: boolean) => void
+  open: boolean
+  tools: ComposioToolPreview[]
+}) {
+  if (!app) {
+    return null
+  }
+
+  const toolCount = app.toolsCount ?? tools.length
+
+  return (
+    <Dialog onOpenChange={onOpenChange} open={open}>
+      <DialogContent className="box-border w-[calc(100vw-1.5rem)] max-w-xl gap-4 overflow-x-hidden p-4 sm:w-full">
+        <DialogHeader className="pr-8 text-left">
+          <DialogTitle className="break-words">{app.name} tools</DialogTitle>
+          <DialogDescription className="break-words">
+            {toolCount > 0
+              ? `${toolCount} tools available through Composio for this integration.`
+              : 'Tools available through Composio for this integration.'}
+          </DialogDescription>
+        </DialogHeader>
+
+        {loading ? (
+          <div className="flex min-h-32 items-center justify-center text-xs text-muted-foreground">
+            <Loader2 className="mr-2 size-3.5 animate-spin" />
+            Loading tools...
+          </div>
+        ) : error ? (
+          <div className="rounded-[6px] border border-(--ui-stroke-secondary) bg-(--ui-bg-secondary) px-3 py-2 text-xs break-words text-muted-foreground">
+            {error}
+          </div>
+        ) : tools.length === 0 ? (
+          <div className="text-xs text-muted-foreground">No tools are available for this integration yet.</div>
+        ) : (
+          <div className="max-h-[min(50vh,28rem)] space-y-2 overflow-y-auto overflow-x-hidden pr-1">
+            {tools.map(tool => (
+              <div
+                className="min-w-0 rounded-[6px] border border-primary/20 bg-white px-3 py-2"
+                key={tool.slug || tool.name}
+              >
+                <div className="text-sm font-medium break-words text-neutral-900">{tool.name}</div>
+                {tool.description ? (
+                  <div className="mt-1 text-xs leading-5 break-words text-neutral-600">{tool.description}</div>
+                ) : null}
+                {tool.slug ? (
+                  <div className="mt-1 font-mono text-[0.65rem] break-all text-neutral-400">{tool.slug}</div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   )
 }
 
