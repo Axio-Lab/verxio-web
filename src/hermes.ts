@@ -472,11 +472,26 @@ export function reloadSkills(): Promise<SkillsReloadResponse> {
   })
 }
 
-export function getSkillsConfig(): Promise<SkillsConfigResponse> {
-  return window.hermesDesktop.api({
-    ...profileScoped(),
-    path: '/api/skills/config'
-  })
+export async function getSkillsConfig(): Promise<SkillsConfigResponse> {
+  try {
+    return await window.hermesDesktop.api<SkillsConfigResponse>({
+      ...profileScoped(),
+      path: '/api/skills/config'
+    })
+  } catch {
+    const config = await getHermesConfigRecord()
+    const skills = config.skills
+
+    if (skills && typeof skills === 'object' && !Array.isArray(skills)) {
+      const external = (skills as Record<string, unknown>).external_dirs
+
+      if (Array.isArray(external)) {
+        return { external_dirs: external.map(item => String(item)).filter(Boolean) }
+      }
+    }
+
+    return { external_dirs: [] }
+  }
 }
 
 export function getToolsets(): Promise<ToolsetInfo[]> {

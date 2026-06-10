@@ -100,14 +100,18 @@ export function SkillsAddPanel({ onSkillsChanged }: SkillsAddPanelProps) {
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const loadHubMeta = useCallback(async () => {
-    try {
-      const [sourcesRes, configRes] = await Promise.all([getSkillHubSources(), getSkillsConfig()])
-      setHubSources(sourcesRes.sources.map(s => ({ id: s.id, label: s.label })))
-      setFeatured(sourcesRes.featured || [])
-      setHubInstalled(sourcesRes.installed || {})
-      setExternalDirs(configRes.external_dirs || [])
-    } catch (err) {
-      notifyError(err, 'Failed to load skill hub metadata')
+    const [sourcesResult, configResult] = await Promise.allSettled([getSkillHubSources(), getSkillsConfig()])
+
+    if (sourcesResult.status === 'fulfilled') {
+      setHubSources(sourcesResult.value.sources.map(s => ({ id: s.id, label: s.label })))
+      setFeatured(sourcesResult.value.featured || [])
+      setHubInstalled(sourcesResult.value.installed || {})
+    } else {
+      notifyError(sourcesResult.reason, 'Failed to load skills hub')
+    }
+
+    if (configResult.status === 'fulfilled') {
+      setExternalDirs(configResult.value.external_dirs || [])
     }
   }, [])
 
@@ -453,7 +457,7 @@ export function SkillsAddPanel({ onSkillsChanged }: SkillsAddPanelProps) {
           )}
 
           <Button disabled={creating} onClick={() => void handleCreateCustom()}>
-            {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+            {creating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Create skill
           </Button>
         </div>
