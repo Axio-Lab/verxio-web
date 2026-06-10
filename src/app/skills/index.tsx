@@ -24,9 +24,12 @@ import { asText, includesQuery, prettyName, toolNames, toolsetDisplayLabel } fro
 import { ToolsetConfigPanel } from '../settings/toolset-config-panel'
 import type { SetStatusbarItemGroup } from '../shell/statusbar-controls'
 
-const SKILLS_MODES = ['skills', 'toolsets'] as const
+import { ConnectionsPanel } from './connections-panel'
+
+const SKILLS_MODES = ['skills', 'toolsets', 'connections'] as const
 type SkillsMode = (typeof SKILLS_MODES)[number]
 const SKILLS_PAGE_SIZE = 10
+const CONNECTIONS_PAGE_SIZE = 15
 
 function categoryFor(skill: SkillInfo): string {
   return asText(skill.category) || 'general'
@@ -142,7 +145,7 @@ export function SkillsView({ setStatusbarItemGroup: _setStatusbarItemGroup, ...p
 
   const visibleToolsets = useMemo(() => (toolsets ? filteredToolsets(toolsets, query) : []), [query, toolsets])
 
-  const activeTotal = mode === 'skills' ? visibleSkills.length : visibleToolsets.length
+  const activeTotal = mode === 'skills' ? visibleSkills.length : mode === 'toolsets' ? visibleToolsets.length : 0
   const activePageCount = Math.max(1, Math.ceil(activeTotal / SKILLS_PAGE_SIZE))
   const currentPage = Math.min(page, activePageCount)
   const pageStart = (currentPage - 1) * SKILLS_PAGE_SIZE
@@ -162,12 +165,13 @@ export function SkillsView({ setStatusbarItemGroup: _setStatusbarItemGroup, ...p
 
   const totalSkills = skills?.length || 0
   const enabledToolsets = toolsets?.filter(toolset => toolset.enabled).length || 0
+  const totalToolsets = toolsets?.length || 0
 
   useEffect(() => {
-    if (page > activePageCount) {
+    if (mode !== 'connections' && page > activePageCount) {
       setPage(activePageCount)
     }
-  }, [activePageCount, page, setPage])
+  }, [activePageCount, mode, page, setPage])
 
   function handleModeChange(nextMode: SkillsMode) {
     const params = new URLSearchParams(search)
@@ -191,6 +195,12 @@ export function SkillsView({ setStatusbarItemGroup: _setStatusbarItemGroup, ...p
     setQuery(nextQuery)
     setPage(1)
   }
+
+  const searchHidden =
+    mode === 'skills' ? (skills?.length ?? 0) === 0 : mode === 'toolsets' ? (toolsets?.length ?? 0) === 0 : false
+
+  const searchPlaceholder =
+    mode === 'skills' ? t.skills.searchSkills : mode === 'toolsets' ? t.skills.searchToolsets : 'Search connections...'
 
   async function handleToggleSkill(skill: SkillInfo, enabled: boolean) {
     setSavingSkill(skill.name)
@@ -253,21 +263,23 @@ export function SkillsView({ setStatusbarItemGroup: _setStatusbarItemGroup, ...p
         ) : undefined
       }
       onSearchChange={handleSearchChange}
-      searchHidden={mode === 'skills' ? (skills?.length ?? 0) === 0 : (toolsets?.length ?? 0) === 0}
-      searchPlaceholder={mode === 'skills' ? t.skills.searchSkills : t.skills.searchToolsets}
+      searchHidden={searchHidden}
+      searchPlaceholder={searchPlaceholder}
       searchTrailingAction={
-        <Button
-          aria-label={refreshing ? t.skills.refreshing : t.skills.refresh}
-          className="text-(--ui-text-tertiary) hover:bg-transparent hover:text-foreground"
-          disabled={refreshing}
-          onClick={() => void refreshCapabilities()}
-          size="icon-xs"
-          title={refreshing ? t.skills.refreshing : t.skills.refresh}
-          type="button"
-          variant="ghost"
-        >
-          <Codicon name="refresh" size="0.875rem" spinning={refreshing} />
-        </Button>
+        mode === 'connections' ? undefined : (
+          <Button
+            aria-label={refreshing ? t.skills.refreshing : t.skills.refresh}
+            className="text-(--ui-text-tertiary) hover:bg-transparent hover:text-foreground"
+            disabled={refreshing}
+            onClick={() => void refreshCapabilities()}
+            size="icon-xs"
+            title={refreshing ? t.skills.refreshing : t.skills.refresh}
+            type="button"
+            variant="ghost"
+          >
+            <Codicon name="refresh" size="0.875rem" spinning={refreshing} />
+          </Button>
+        )
       }
       searchValue={query}
       tabs={
@@ -278,10 +290,15 @@ export function SkillsView({ setStatusbarItemGroup: _setStatusbarItemGroup, ...p
           <TextTab active={mode === 'toolsets'} onClick={() => handleModeChange('toolsets')}>
             {t.skills.tabToolsets}
           </TextTab>
+          <TextTab active={mode === 'connections'} onClick={() => handleModeChange('connections')}>
+            Connections
+          </TextTab>
         </>
       }
     >
-      {!skills || !toolsets ? (
+      {mode === 'connections' ? (
+        <ConnectionsPanel onPageChange={setPage} page={page} pageSize={CONNECTIONS_PAGE_SIZE} query={query} />
+      ) : !skills || !toolsets ? (
         <PageLoader label={t.skills.loading} />
       ) : mode === 'skills' ? (
         <div className={cn('h-full overflow-y-auto py-3', PAGE_INSET_X)}>
@@ -336,7 +353,7 @@ export function SkillsView({ setStatusbarItemGroup: _setStatusbarItemGroup, ...p
           ) : (
             <div className="space-y-2">
               <div className="text-xs text-muted-foreground">
-                {t.skills.toolsetsEnabled(enabledToolsets, toolsets.length)}
+                {t.skills.toolsetsEnabled(enabledToolsets, totalToolsets)}
               </div>
               <div>
                 {pagedToolsets.map(toolset => {
