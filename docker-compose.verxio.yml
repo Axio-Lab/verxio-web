@@ -1,0 +1,53 @@
+name: verxio-ai
+
+services:
+  verxio-api:
+    platform: linux/amd64
+    build:
+      context: ./verxio-api
+    image: verxio-api:local
+    ports:
+      - "127.0.0.1:8787:8787"
+    environment:
+      VERXIO_DATABASE_MODE: ${VERXIO_DATABASE_MODE:-turso}
+      VERXIO_DATABASE_PATH: /app/.verxio/verxio-control.sqlite3
+      TURSO_DATABASE_URL: ${TURSO_DATABASE_URL:-}
+      TURSO_AUTH_TOKEN: ${TURSO_AUTH_TOKEN:-}
+      VERXIO_RUNTIME_MANAGER: local-docker
+      VERXIO_RUNTIME_ROOT: /app/.verxio/runtimes
+      VERXIO_RUNTIME_DOCKER_ROOT: ${PWD}/.verxio/runtimes
+      VERXIO_HERMES_IMAGE: ${VERXIO_HERMES_IMAGE:-verxio-hermes-runtime:local}
+      VERXIO_RUNTIME_CONNECT_HOST: ${VERXIO_RUNTIME_CONNECT_HOST:-host.docker.internal}
+      VERXIO_RUNTIME_PUBLISH_HOST: ${VERXIO_RUNTIME_PUBLISH_HOST:-127.0.0.1}
+      VERXIO_RUNTIME_UID: ${HERMES_UID:-10000}
+      VERXIO_RUNTIME_GID: ${HERMES_GID:-10000}
+      VERXIO_DASHBOARD_PORT_START: ${VERXIO_DASHBOARD_PORT_START:-19119}
+      VERXIO_COOKIE_SECURE: ${VERXIO_COOKIE_SECURE:-false}
+      VERXIO_CORS_ORIGINS: ${VERXIO_CORS_ORIGINS:-}
+      VERXIO_SESSION_DAYS: ${VERXIO_SESSION_DAYS:-7}
+      COMPOSIO_API_KEY: ${COMPOSIO_API_KEY:-}
+      COMPOSIO_API_BASE_URL: ${COMPOSIO_API_BASE_URL:-https://backend.composio.dev/api/v3}
+      COMPOSIO_TOOLS_API_BASE_URL: ${COMPOSIO_TOOLS_API_BASE_URL:-https://backend.composio.dev/api/v3.1}
+    volumes:
+      - ./.verxio:/app/.verxio
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  verxio-web:
+    build:
+      context: ./verxio-web
+      args:
+        VITE_VERXIO_API_ENABLED: "true"
+        VITE_VERXIO_API_URL: ""
+    image: verxio-web:local
+    depends_on:
+      - verxio-api
+    ports:
+      - "127.0.0.1:8080:80"
+
+  hermes-runtime-image:
+    build:
+      context: ./hermes-agent
+    image: ${VERXIO_HERMES_IMAGE:-verxio-hermes-runtime:local}
+    profiles:
+      - image
+    command: ["true"]
