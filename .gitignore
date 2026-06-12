@@ -1,0 +1,33 @@
+# Local runtime / secrets
+.verxio/
+.env
+.env.local
+.env.*.local
+
+# Dependencies & build output
+node_modules/
+dist/
+build/
+.next/
+out/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# OS & editors
+.DS_Store
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Logs & coverage
+*.log
+coverage/
+htmlcov/
