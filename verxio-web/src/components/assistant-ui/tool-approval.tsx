@@ -90,7 +90,7 @@ const ApprovalBar: FC<{ request: ApprovalRequest }> = ({ request }) => {
         setSubmitting(null)
       }
     },
-    [busy, gateway, request.sessionId]
+    [busy, copy.gatewayDisconnected, copy.sendFailed, gateway, request.sessionId]
   )
 
   // Mod+Enter → Run, Esc → Reject.
