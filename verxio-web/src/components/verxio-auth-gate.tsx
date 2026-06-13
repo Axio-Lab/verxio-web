@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
-import { LOGIN_ROUTE, NEW_CHAT_ROUTE, SIGNOUT_ROUTE } from '@/app/routes'
+import { LOGIN_ROUTE, NEW_CHAT_ROUTE, SIGNOUT_ROUTE, SIGNUP_ROUTE } from '@/app/routes'
 import { BrandMark } from '@/components/brand-mark'
 import { PageLoader } from '@/components/page-loader'
 import { Button } from '@/components/ui/button'
@@ -62,6 +62,18 @@ function cleanCode(value: string): string {
   return value.replace(/\D/g, '').slice(0, 6)
 }
 
+function isAuthRoute(pathname: string): boolean {
+  return pathname === LOGIN_ROUTE || pathname === SIGNUP_ROUTE
+}
+
+function routeDefaultMode(pathname: string): AuthMode {
+  return pathname === SIGNUP_ROUTE ? 'signup' : 'code-login'
+}
+
+function routeForMode(mode: AuthMode): string {
+  return mode === 'signup' ? SIGNUP_ROUTE : LOGIN_ROUTE
+}
+
 function modeTitle(mode: AuthMode, pendingPurpose: VerxioAuthCodePurpose | null): string {
   if (pendingPurpose === 'email_verify') {
     return 'Verify your email'
@@ -119,7 +131,7 @@ export function VerxioAuthGate({ children }: VerxioAuthGateProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const [status, setStatus] = useState<AuthStatus>(enabled ? 'checking' : 'authenticated')
-  const [mode, setMode] = useState<AuthMode>('code-login')
+  const [mode, setMode] = useState<AuthMode>(() => routeDefaultMode(location.pathname))
   const [pendingPurpose, setPendingPurpose] = useState<VerxioAuthCodePurpose | null>(null)
   const [auth, setAuth] = useState<VerxioAuthResponse | null>(null)
   const [email, setEmail] = useState('')
@@ -148,7 +160,7 @@ export function VerxioAuthGate({ children }: VerxioAuthGateProps) {
         setAuth(result)
         setStatus('authenticated')
 
-        if (location.pathname === LOGIN_ROUTE) {
+        if (isAuthRoute(location.pathname)) {
           navigate(NEW_CHAT_ROUTE, { replace: true })
         }
       })
@@ -166,12 +178,36 @@ export function VerxioAuthGate({ children }: VerxioAuthGateProps) {
   }, [enabled, location.pathname, navigate])
 
   useEffect(() => {
-    if (!enabled || status !== 'guest' || location.pathname === LOGIN_ROUTE) {
+    if (!enabled || status !== 'guest' || isAuthRoute(location.pathname)) {
       return
     }
 
     navigate(LOGIN_ROUTE, { replace: true })
   }, [enabled, location.pathname, navigate, status])
+
+  useEffect(() => {
+    if (!enabled || status !== 'guest' || pendingPurpose || !isAuthRoute(location.pathname)) {
+      return
+    }
+
+    const nextMode = routeDefaultMode(location.pathname)
+
+    if (location.pathname === SIGNUP_ROUTE && mode !== 'signup') {
+      setMode(nextMode)
+      setCode('')
+      setPassword('')
+      setError(null)
+      setNotice(null)
+    }
+
+    if (location.pathname === LOGIN_ROUTE && mode === 'signup') {
+      setMode(nextMode)
+      setCode('')
+      setPassword('')
+      setError(null)
+      setNotice(null)
+    }
+  }, [enabled, location.pathname, mode, pendingPurpose, status])
 
   useEffect(() => {
     if (!enabled || status !== 'authenticated' || location.pathname !== SIGNOUT_ROUTE) {
@@ -236,6 +272,12 @@ export function VerxioAuthGate({ children }: VerxioAuthGateProps) {
     setPassword('')
     setError(null)
     setNotice(null)
+
+    const nextRoute = routeForMode(nextMode)
+
+    if (location.pathname !== nextRoute) {
+      navigate(nextRoute, { replace: true })
+    }
   }
 
   function completeAuth(result: VerxioAuthResponse) {
@@ -312,7 +354,7 @@ export function VerxioAuthGate({ children }: VerxioAuthGateProps) {
       const message = readableAuthError(submitError)
 
       if (mode === 'password-login' && message.includes('Verify your email')) {
-        setMode('code-login')
+        resetMode('code-login')
         setPendingPurpose('email_verify')
         setCode('')
         setNotice('Verification code sent.')
@@ -528,7 +570,12 @@ export function VerxioAuthGate({ children }: VerxioAuthGateProps) {
               <RefreshCw aria-hidden="true" className={cn('size-3.5', resending && 'animate-spin')} />
               {resending ? 'Sending...' : 'Resend code'}
             </Button>
-            <Button onClick={() => resetMode('code-login')} size="inline" type="button" variant="textStrong">
+            <Button
+              onClick={() => resetMode(routeDefaultMode(location.pathname))}
+              size="inline"
+              type="button"
+              variant="textStrong"
+            >
               Use another email
             </Button>
           </div>
@@ -536,7 +583,7 @@ export function VerxioAuthGate({ children }: VerxioAuthGateProps) {
 
         {!pendingPurpose && (
           <div className="mt-4 space-y-2 text-center text-xs text-muted-foreground">
-            {mode !== 'code-login' && (
+            {mode !== 'code-login' && mode !== 'signup' && (
               <Button onClick={() => resetMode('code-login')} size="inline" type="button" variant="textStrong">
                 Sign in with code
               </Button>
