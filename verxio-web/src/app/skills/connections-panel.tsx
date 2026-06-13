@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import { PageLoader } from '@/components/page-loader'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -573,10 +574,7 @@ export function ConnectionsPanel({ onPageChange, page, pageSize, query }: Connec
         )}
 
         {loading ? (
-          <div className="flex min-h-52 items-center justify-center text-xs text-muted-foreground">
-            <Loader2 className="mr-2 size-3.5 animate-spin" />
-            Loading connections...
-          </div>
+          <PageLoader className="min-h-52" label="Loading connections" />
         ) : filteredApps.length === 0 ? (
           <div className="grid min-h-52 place-items-center text-center">
             <div>
